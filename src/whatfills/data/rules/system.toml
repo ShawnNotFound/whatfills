@@ -1,0 +1,340 @@
+# Built-in rules: system logs, package managers, containers, crash dumps,
+# kernels and other places that commonly fill Linux root filesystems.
+version = 1
+
+[[rule]]
+id = "journald"
+name = "systemd journal (system logs)"
+category = "logs"
+safety = "safe"
+paths = ["/var/log/journal", "/run/log/journal"]
+explain = "Logs collected by systemd-journald. Unless a limit is set, the journal may use up to 10% of the filesystem, capped at 4 GiB. Shrinking it removes the oldest entries first."
+fix = [
+  { label = "Shrink the journal to 500 MB", run = "journalctl --vacuum-size=500M", root = true },
+  { label = "Show how much the journal uses", run = "journalctl --disk-usage", root = true },
+]
+tips = ["To cap it for good, set SystemMaxUse=500M in /etc/systemd/journald.conf (or in a file under /etc/systemd/journald.conf.d/), then run: sudo systemctl restart systemd-journald"]
+
+[[rule]]
+id = "var-log"
+name = "System and service logs"
+category = "logs"
+safety = "review"
+paths = ["/var/log"]
+explain = "Log files written by the system and by services. A single huge current log usually means a service is logging far more than normal, which is worth fixing at the source. If a program still has a big log open, deleting the file does not free the space until the program restarts; emptying it with `truncate -s 0 FILE` does."
+tips = ["logrotate decides how long old logs are kept: see /etc/logrotate.conf and /etc/logrotate.d/."]
+
+[[rule]]
+id = "rotated-logs"
+name = "Old rotated log files"
+category = "logs"
+safety = "safe"
+files = ["*.[0-9]", "*.[0-9][0-9]", "*.gz", "*.xz", "*.bz2", "*.zst", "*.old"]
+within = ["var-log"]
+explain = "Older log files that logrotate already moved aside or compressed. Nothing writes to them any more."
+fix = [{ label = "Delete rotated logs older than 2 weeks", run = 'find /var/log -type f \( -name "*.[0-9]" -o -name "*.gz" -o -name "*.xz" -o -name "*.old" \) -mtime +14 -delete', root = true }]
+
+[[rule]]
+id = "apt-cache"
+name = "APT downloaded packages"
+category = "packages"
+safety = "safe"
+paths = ["/var/cache/apt/archives"]
+explain = "Package files (.deb) that apt downloaded to install or upgrade software. They are not needed once the packages are installed."
+fix = [{ label = "Delete downloaded package files", run = "apt-get clean", root = true }]
+
+[[rule]]
+id = "dnf-cache"
+name = "DNF/YUM package cache"
+category = "packages"
+safety = "safe"
+paths = ["/var/cache/dnf", "/var/cache/yum", "/var/cache/libdnf5"]
+explain = "Repository metadata and downloaded .rpm files kept by dnf or yum."
+fix = [{ label = "Clear the package cache", run = "dnf clean all", root = true }]
+
+[[rule]]
+id = "pacman-cache"
+name = "pacman package cache"
+category = "packages"
+safety = "safe"
+paths = ["/var/cache/pacman/pkg"]
+explain = "Every package version pacman has downloaded. By default it keeps all of them, so the cache only grows."
+fix = [
+  { label = "Keep only the 2 newest versions of each package", run = "paccache -rk2", root = true, note = "paccache comes with the pacman-contrib package." },
+  { label = "Remove cached packages that are no longer installed", run = "pacman -Sc", root = true },
+]
+
+[[rule]]
+id = "zypper-cache"
+name = "zypper package cache"
+category = "packages"
+safety = "safe"
+paths = ["/var/cache/zypp"]
+explain = "Repository metadata and downloaded packages kept by zypper."
+fix = [{ label = "Clear the package cache", run = "zypper clean --all", root = true }]
+
+[[rule]]
+id = "snap-revisions"
+name = "Snap packages and old revisions"
+category = "packages"
+safety = "review"
+paths = ["/var/lib/snapd/snaps"]
+explain = "Snap packages, stored as .snap files. After each update snapd keeps older revisions of the snap (how many is set by refresh.retain), and these add up."
+fix = [
+  { label = "Show old (disabled) revisions", run = "snap list --all" },
+  { label = "Remove one old revision", run = "snap remove NAME --revision=REV", root = true },
+]
+tips = ["Keep fewer old revisions: sudo snap set system refresh.retain=2 (2 is the lowest allowed value)."]
+
+[[rule]]
+id = "snap-user-data"
+name = "Snap app data in home folders"
+category = "packages"
+safety = "review"
+paths = ["~/snap"]
+explain = "Per-user data of snap apps, including copies kept for older revisions."
+
+[[rule]]
+id = "flatpak"
+name = "Flatpak apps and runtimes"
+category = "packages"
+safety = "review"
+paths = ["/var/lib/flatpak", "~/.local/share/flatpak"]
+explain = "Flatpak apps and the runtimes they need. Runtimes stay installed after the apps that used them are removed."
+fix = [{ label = "Remove runtimes that no app uses", run = "flatpak uninstall --unused" }]
+
+[[rule]]
+id = "docker"
+name = "Docker images, containers and build cache"
+category = "containers"
+safety = "caution"
+paths = ["/var/lib/docker", "~/.local/share/docker"]
+explain = "Everything Docker stores: images, containers, volumes and the build cache. Images and build cache pile up as you pull and build, and stopped containers and unused volumes stay until removed. Deleting files here by hand breaks Docker."
+fix = [
+  { label = "See what Docker is using", run = "docker system df", root = true },
+  { label = "Remove stopped containers, unused networks, dangling images and build cache", run = "docker system prune", root = true },
+  { label = "Remove the build cache only", run = "docker builder prune", root = true },
+]
+tips = ["Docker can keep its data on a bigger disk: set \"data-root\" in /etc/docker/daemon.json and restart Docker."]
+
+[[rule]]
+id = "docker-logs"
+name = "Docker container logs"
+category = "logs"
+safety = "review"
+files = ["*-json.log"]
+within = ["docker"]
+explain = "Output of running and stopped containers, saved by the default json-file log driver. Without a size limit these logs keep growing for as long as the container exists."
+tips = ["Limit container logs in /etc/docker/daemon.json: \"log-opts\": {\"max-size\": \"50m\", \"max-file\": \"3\"}. This applies to containers created afterwards."]
+
+[[rule]]
+id = "containerd"
+name = "containerd images and snapshots"
+category = "containers"
+safety = "caution"
+paths = ["/var/lib/containerd"]
+explain = "Images and filesystem snapshots used by containerd, for example on Kubernetes nodes. Deleting files here by hand breaks the container runtime."
+fix = [{ label = "Remove unused images (Kubernetes nodes)", run = "crictl rmi --prune", root = true }]
+
+[[rule]]
+id = "podman"
+name = "Podman images and containers"
+category = "containers"
+safety = "caution"
+paths = ["/var/lib/containers", "~/.local/share/containers"]
+explain = "Images, containers and volumes stored by Podman (and Buildah). Deleting files here by hand breaks Podman."
+fix = [{ label = "Remove unused containers, images and build cache", run = "podman system prune" }]
+
+[[rule]]
+id = "vm-storage"
+name = "Virtual machine disks"
+category = "containers"
+safety = "review"
+paths = ["/var/lib/libvirt/images", "~/.local/share/libvirt/images", "~/.local/share/gnome-boxes/images"]
+dirs = ["VirtualBox VMs"]
+explain = "Disks of virtual machines. Each one can be tens of GB. Delete VMs you no longer use from their manager (virt-manager, GNOME Boxes, VirtualBox) so its settings are removed too."
+
+[[rule]]
+id = "vm-images"
+name = "Virtual machine disk files"
+category = "containers"
+safety = "review"
+files = ["*.qcow2", "*.vdi", "*.vmdk", "*.vhd", "*.vhdx"]
+min_size = "256M"
+explain = "Disk image files used by virtual machines."
+
+[[rule]]
+id = "coredumps"
+name = "Crash dumps"
+category = "system"
+safety = "safe"
+paths = ["/var/lib/systemd/coredump", "/var/crash", "/var/lib/apport/coredump"]
+explain = "Memory dumps saved when programs crashed. They help developers debug the crash and are otherwise not needed."
+fix = [
+  { label = "List saved crash dumps", run = "coredumpctl list" },
+  { label = "Delete saved crash dumps", run = "rm -f /var/lib/systemd/coredump/* /var/crash/*", root = true },
+]
+
+[[rule]]
+id = "core-files"
+name = "Core dump files"
+category = "system"
+safety = "review"
+files = ["core.[0-9]*"]
+min_size = "1M"
+explain = "Core dumps written into a program's working folder when it crashed."
+
+[[rule]]
+id = "kernel-modules"
+name = "Installed kernels (modules)"
+category = "system"
+safety = "caution"
+paths = ["/usr/lib/modules", "/lib/modules"]
+explain = "Driver modules for each installed kernel. Old kernels stay installed until you remove them, and each one takes a few hundred MB here and in /boot."
+fix = [
+  { label = "Remove old kernels (Debian, Ubuntu)", run = "apt autoremove --purge", root = true },
+  { label = "Remove old kernels (Fedora, RHEL)", run = "dnf remove --oldinstallonly", root = true },
+]
+
+[[rule]]
+id = "boot"
+name = "Boot files and kernels"
+category = "system"
+safety = "caution"
+paths = ["/boot"]
+explain = "Kernels, initramfs images and the boot loader. When /boot is full, remove old kernels with the package manager instead of deleting files."
+
+[[rule]]
+id = "usr"
+name = "Installed software"
+category = "system"
+safety = "caution"
+paths = ["/usr"]
+explain = "Programs and libraries installed by the package manager. Remove software you don't use with the package manager; never delete files here by hand."
+fix = [
+  { label = "List the 20 biggest packages (Debian, Ubuntu)", run = "dpkg-query -Wf '${Installed-Size}\\t${Package}\\n' | sort -n | tail -n 20", note = "Sizes are in KiB." },
+  { label = "List the 20 biggest packages (Fedora, RHEL, openSUSE)", run = "rpm -qa --queryformat '%{SIZE} %{NAME}\\n' | sort -n | tail -n 20", note = "Sizes are in bytes." },
+]
+
+[[rule]]
+id = "opt"
+name = "Software outside the package manager"
+category = "system"
+safety = "review"
+paths = ["/opt"]
+explain = "Software installed by vendor installers rather than the package manager, such as CUDA, IDEs or proprietary tools. Uninstall it with its own uninstaller if it has one."
+
+[[rule]]
+id = "tmp"
+name = "Temporary files"
+category = "system"
+safety = "review"
+paths = ["/tmp", "/var/tmp"]
+explain = "Temporary files. /tmp is often emptied at reboot, but /var/tmp is kept across reboots. Programs sometimes leave large files behind in both."
+
+[[rule]]
+id = "var-cache"
+name = "System caches"
+category = "caches"
+safety = "review"
+paths = ["/var/cache"]
+explain = "Caches kept by system services. Most can be recreated, but use the owning program's clean command when it has one."
+
+[[rule]]
+id = "swapfile"
+name = "Swap file"
+category = "system"
+safety = "caution"
+files = ["swapfile", "swap.img", "*.swap"]
+in_dirs = ["/"]
+explain = "Disk space that the kernel uses as extra memory. Its size was fixed when it was created; it does not grow."
+tips = ["To make it smaller: turn it off with swapoff, recreate it at the new size, and turn it back on with swapon."]
+
+[[rule]]
+id = "lost-found"
+name = "Recovered file fragments"
+category = "system"
+safety = "caution"
+dirs = ["lost+found"]
+explain = "Pieces of files that fsck recovered after a crash or a disk error. Check them before deleting; usually they are not needed."
+
+[[rule]]
+id = "trash"
+name = "Trash"
+category = "trash"
+safety = "safe"
+dirs = [".local/share/Trash", ".Trash-*", ".Trash"]
+explain = "Files you deleted in a file manager. They keep using disk space until the trash is emptied."
+fix = [{ label = "Empty your trash", run = "gio trash --empty" }]
+
+[[rule]]
+id = "timeshift"
+name = "Timeshift snapshots"
+category = "backups"
+safety = "caution"
+paths = ["/timeshift", "/run/timeshift"]
+explain = "System snapshots made by Timeshift. Delete old snapshots from Timeshift itself so it keeps its records straight."
+fix = [{ label = "List snapshots", run = "timeshift --list", root = true }]
+
+[[rule]]
+id = "snapper"
+name = "Snapper snapshots"
+category = "backups"
+safety = "caution"
+paths = ["/.snapshots"]
+explain = "Btrfs snapshots made by snapper. They share data with the live system, so their real cost is the data that changed since each snapshot."
+fix = [{ label = "List snapshots", run = "snapper list", root = true }]
+
+[[rule]]
+id = "mysql"
+name = "MySQL / MariaDB data"
+category = "databases"
+safety = "caution"
+paths = ["/var/lib/mysql"]
+explain = "Database files. Never delete files here by hand; drop or clean up data inside the database instead."
+
+[[rule]]
+id = "mysql-binlogs"
+name = "MySQL / MariaDB binary logs"
+category = "databases"
+safety = "review"
+files = ["binlog.[0-9]*", "mysql-bin.[0-9]*", "mariadb-bin.[0-9]*"]
+within = ["mysql"]
+explain = "Binary logs used for replication and point-in-time recovery. They pile up when no expiry is configured."
+fix = [{ label = "Delete binary logs older than 7 days", run = "mysql -e \"PURGE BINARY LOGS BEFORE NOW() - INTERVAL 7 DAY\"", root = true, note = "Make sure no replica still needs them." }]
+tips = ["Expire them automatically with binlog_expire_logs_seconds (MySQL 8) or expire_logs_days (MariaDB)."]
+
+[[rule]]
+id = "postgresql"
+name = "PostgreSQL data"
+category = "databases"
+safety = "caution"
+paths = ["/var/lib/postgresql", "/var/lib/pgsql"]
+explain = "Database files. Never delete files here by hand. A very large pg_wal folder usually means an unused replication slot or failing WAL archiving."
+
+[[rule]]
+id = "nix-store"
+name = "Nix store"
+category = "packages"
+safety = "caution"
+paths = ["/nix/store"]
+explain = "Every package version that Nix keeps for current and older generations."
+fix = [{ label = "Delete old generations and unused packages", run = "nix-collect-garbage -d", root = true, note = "You can no longer roll back to the deleted generations." }]
+
+[[rule]]
+id = "guix-store"
+name = "Guix store"
+category = "packages"
+safety = "caution"
+paths = ["/gnu/store"]
+explain = "Every package version that Guix keeps for current and older generations."
+fix = [{ label = "Collect garbage", run = "guix gc" }]
+
+[[rule]]
+id = "apptainer-cache"
+name = "Apptainer / Singularity cache"
+category = "caches"
+safety = "safe"
+dirs = [".apptainer/cache", ".singularity/cache"]
+explain = "Downloaded container layers and built images cached by Apptainer or Singularity."
+fix = [{ label = "Clear the cache", run = "apptainer cache clean", note = "Use `singularity cache clean` on older installs." }]

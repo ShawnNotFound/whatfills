@@ -1,0 +1,76 @@
+# Built-in rules: machine learning model caches, checkpoints and tool caches.
+version = 1
+
+[[rule]]
+id = "hf-cache"
+name = "Hugging Face models and datasets"
+category = "ml"
+safety = "regenerable"
+dirs = [".cache/huggingface"]
+paths = ["$HF_HOME", "$HF_HUB_CACHE", "$HF_DATASETS_CACHE"]
+explain = "Models and datasets downloaded by Hugging Face libraries (transformers, diffusers, datasets, huggingface_hub). Anything deleted is downloaded again the next time it is used."
+fix = [
+  { label = "List cached models with their sizes", run = "huggingface-cli scan-cache" },
+  { label = "Pick cached models to delete", run = "huggingface-cli delete-cache" },
+]
+tips = ["Keep the cache on a bigger disk: add export HF_HOME=/path/on/big/disk/huggingface to your shell profile."]
+
+[[rule]]
+id = "torch-hub"
+name = "PyTorch hub cache"
+category = "ml"
+safety = "regenerable"
+dirs = [".cache/torch"]
+paths = ["$TORCH_HOME"]
+explain = "Model weights and code downloaded by torch.hub and torchvision. They are downloaded again when needed."
+tips = ["Set TORCH_HOME to keep this cache on another disk."]
+
+[[rule]]
+id = "ollama"
+name = "Ollama models"
+category = "ml"
+safety = "review"
+dirs = [".ollama/models"]
+paths = ["/usr/share/ollama/.ollama/models", "/var/lib/ollama", "$OLLAMA_MODELS"]
+explain = "Models pulled with Ollama. Each one is several GB."
+fix = [
+  { label = "List models", run = "ollama list" },
+  { label = "Remove a model", run = "ollama rm MODEL" },
+]
+tips = ["Set OLLAMA_MODELS to keep models on another disk."]
+
+[[rule]]
+id = "lmstudio"
+name = "LM Studio models"
+category = "ml"
+safety = "review"
+dirs = [".lmstudio/models", ".cache/lm-studio/models"]
+explain = "Models downloaded in LM Studio. Remove the ones you don't use from LM Studio's model list."
+
+[[rule]]
+id = "ml-compile-caches"
+name = "GPU kernel and compile caches"
+category = "caches"
+safety = "safe"
+dirs = [".cache/vllm", ".triton/cache", ".cache/torch_extensions", ".nv/ComputeCache"]
+explain = "Compiled GPU kernels and graphs cached by vLLM, Triton, PyTorch extensions and the CUDA driver. They are rebuilt when needed, which makes the next start slower."
+
+[[rule]]
+id = "wandb"
+name = "Weights & Biases local files"
+category = "ml"
+safety = "review"
+dirs = [".cache/wandb", ".local/share/wandb", "wandb"]
+require_child = ["latest-run", "artifacts", "logs"]
+explain = "Local copies of W&B runs and artifacts. Runs that were synced are also stored online."
+fix = [{ label = "Delete local files of runs that were synced", run = "wandb sync --clean" }]
+
+[[rule]]
+id = "model-files"
+name = "Model weights and checkpoints"
+category = "ml"
+safety = "review"
+files = ["*.safetensors", "*.ckpt", "*.pt", "*.pth", "*.gguf", "*.onnx", "*.h5", "*.keras"]
+min_size = "100M"
+outside = ["hf-cache", "torch-hub", "ollama", "lmstudio"]
+explain = "Model weights or training checkpoints. Training scripts often save a checkpoint every few steps, and old ones are rarely needed once a run is finished."

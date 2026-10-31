@@ -1,0 +1,117 @@
+# Built-in rules: home folders, caches and personal files.
+version = 1
+
+[[rule]]
+id = "downloads"
+name = "Downloads folders"
+category = "personal"
+safety = "review"
+paths = ["~/Downloads"]
+explain = "Files you downloaded. Old installers, archives and disk images tend to collect here."
+tips = ["To keep Downloads on another disk, move the folder and run: xdg-user-dirs-update --set DOWNLOAD /new/place/Downloads (then log out and back in)."]
+
+[[rule]]
+id = "personal-folders"
+name = "Your documents, pictures, music and videos"
+category = "personal"
+safety = "review"
+paths = ["~/Desktop", "~/Documents", "~/Pictures", "~/Music", "~/Videos"]
+explain = "Your own files. Move them to a bigger disk rather than deleting them."
+tips = ["To keep these folders on another disk, move them and update the desktop's record of where they are, for example: xdg-user-dirs-update --set DOCUMENTS /data/Documents (also DESKTOP, PICTURES, MUSIC, VIDEOS). Log out and back in afterwards."]
+
+[[rule]]
+id = "disk-images"
+name = "Disk images (ISO)"
+category = "personal"
+safety = "review"
+files = ["*.iso"]
+min_size = "100M"
+explain = "Disk images, usually operating system installers or live systems that were already used."
+
+[[rule]]
+id = "installers"
+name = "Downloaded installers"
+category = "personal"
+safety = "review"
+files = ["*.deb", "*.rpm", "*.appimage", "*.run", "*.exe", "*.msi", "*.dmg", "*.pkg"]
+min_size = "20M"
+within = ["downloads"]
+explain = "Installers you downloaded. Once the software is installed, they are usually not needed."
+
+[[rule]]
+id = "archives"
+name = "Large archives"
+category = "personal"
+safety = "review"
+files = ["*.zip", "*.tar", "*.tar.gz", "*.tgz", "*.tar.xz", "*.tar.zst", "*.tar.bz2", "*.7z", "*.rar"]
+min_size = "100M"
+outside = ["var-log", "journald", "docker", "containerd", "podman"]
+explain = "Large compressed archives. If you have already extracted one, the archive itself may not be needed."
+
+[[rule]]
+id = "videos"
+name = "Video files"
+category = "media"
+safety = "review"
+files = ["*.mp4", "*.mkv", "*.mov", "*.avi", "*.webm", "*.m4v", "*.wmv", "*.ts"]
+min_size = "100M"
+explain = "Video files. To keep them, move them to another disk or external storage."
+
+[[rule]]
+id = "backup-files"
+name = "Backup copies"
+category = "backups"
+safety = "review"
+files = ["*.bak", "*.backup", "*.old"]
+min_size = "100M"
+outside = ["var-log"]
+explain = "Files saved as backup copies. Check whether a newer copy exists before deleting."
+
+[[rule]]
+id = "thumbnails"
+name = "Thumbnail cache"
+category = "caches"
+safety = "safe"
+dirs = [".cache/thumbnails"]
+explain = "Picture previews made by file managers. They are recreated when needed."
+
+[[rule]]
+id = "browser-cache"
+name = "Web browser caches"
+category = "caches"
+safety = "safe"
+dirs = [".cache/mozilla", ".cache/google-chrome", ".cache/chromium", ".cache/BraveSoftware", ".cache/microsoft-edge", ".cache/vivaldi", ".cache/opera"]
+explain = "Cached web pages and media. The browser rebuilds the cache as you browse. Close the browser before deleting it."
+
+[[rule]]
+id = "spotify-cache"
+name = "Spotify cache"
+category = "caches"
+safety = "safe"
+dirs = [".cache/spotify"]
+explain = "Music cached by Spotify for offline playback and faster starts. The cache size can be limited in Spotify's settings."
+
+[[rule]]
+id = "user-cache"
+name = "Other app caches"
+category = "caches"
+safety = "review"
+dirs = [".cache"]
+explain = "The per-user cache folder. Apps keep data here that they can recreate. Check its biggest sub-folders first; most can be deleted while the apps that own them are closed."
+tips = ["Moving the whole cache to another disk is possible with XDG_CACHE_HOME, set before you log in."]
+
+[[rule]]
+id = "steam"
+name = "Steam games"
+category = "personal"
+safety = "review"
+dirs = [".local/share/Steam/steamapps", ".steam/steam/steamapps"]
+explain = "Games installed by Steam. Uninstall games you don't play from Steam, or add a library folder on another disk in Steam's storage settings and move games there."
+
+[[rule]]
+id = "wine-prefix"
+name = "Wine prefixes"
+category = "personal"
+safety = "review"
+dirs = [".wine"]
+explain = "A Wine prefix: a Windows-style folder tree with the Windows programs installed in it."

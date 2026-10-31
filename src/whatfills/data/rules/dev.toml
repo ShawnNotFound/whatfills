@@ -1,0 +1,273 @@
+# Built-in rules: programming languages, package managers and build outputs.
+version = 1
+
+[[rule]]
+id = "node-modules"
+name = "node_modules folders"
+category = "dev"
+safety = "regenerable"
+dirs = ["node_modules"]
+explain = "Packages installed for JavaScript or TypeScript projects. Every project has its own copy, so they add up quickly. Reinstall with npm, yarn or pnpm install when you work on the project again."
+
+[[rule]]
+id = "npm-cache"
+name = "npm cache"
+category = "caches"
+safety = "safe"
+dirs = [".npm/_cacache"]
+explain = "Packages npm downloaded. npm downloads them again when needed."
+fix = [{ label = "Clear the npm cache", run = "npm cache clean --force" }]
+
+[[rule]]
+id = "yarn-cache"
+name = "Yarn cache"
+category = "caches"
+safety = "safe"
+dirs = [".cache/yarn", ".yarn/berry/cache"]
+explain = "Packages Yarn downloaded. Yarn downloads them again when needed."
+fix = [{ label = "Clear the Yarn cache", run = "yarn cache clean" }]
+
+[[rule]]
+id = "pnpm-store"
+name = "pnpm store"
+category = "caches"
+safety = "safe"
+dirs = [".local/share/pnpm/store", ".pnpm-store"]
+explain = "The shared package store of pnpm. Packages no project uses any more stay until the store is pruned."
+fix = [{ label = "Remove packages no project uses", run = "pnpm store prune" }]
+
+[[rule]]
+id = "python-venv"
+name = "Python virtual environments"
+category = "dev"
+safety = "regenerable"
+dirs = [".venv", "venv", ".env", "env", "virtualenv", ".virtualenvs/*"]
+require_child = ["pyvenv.cfg"]
+explain = "Python virtual environments. Each one holds its own copy of every installed package. Recreate one from the project's requirements when you need it again."
+
+[[rule]]
+id = "tox-nox"
+name = "tox / nox test environments"
+category = "dev"
+safety = "regenerable"
+dirs = [".tox", ".nox"]
+explain = "Virtual environments created by tox or nox to run tests. They are rebuilt on the next run."
+
+[[rule]]
+id = "pycache"
+name = "Python bytecode caches"
+category = "dev"
+safety = "regenerable"
+dirs = ["__pycache__"]
+explain = "Compiled Python files. Python writes them again the next time the code runs."
+
+[[rule]]
+id = "pip-cache"
+name = "pip download cache"
+category = "caches"
+safety = "safe"
+dirs = [".cache/pip"]
+paths = ["$PIP_CACHE_DIR"]
+explain = "Packages and wheels pip downloaded or built. pip downloads them again when needed."
+fix = [{ label = "Clear the pip cache", run = "pip cache purge" }]
+tips = ["Keep it on a bigger disk: export PIP_CACHE_DIR=/path/on/big/disk/pip"]
+
+[[rule]]
+id = "uv-cache"
+name = "uv cache"
+category = "caches"
+safety = "safe"
+dirs = [".cache/uv"]
+paths = ["$UV_CACHE_DIR"]
+explain = "Packages uv downloaded and unpacked. It grows with every Python version and package version you install."
+fix = [
+  { label = "Remove unused entries", run = "uv cache prune" },
+  { label = "Clear the whole cache", run = "uv cache clean" },
+]
+
+[[rule]]
+id = "poetry-cache"
+name = "Poetry cache"
+category = "caches"
+safety = "safe"
+dirs = [".cache/pypoetry"]
+explain = "Packages and virtual environments managed by Poetry. Poetry recreates them when needed."
+
+[[rule]]
+id = "conda-pkgs"
+name = "Conda package cache"
+category = "caches"
+safety = "safe"
+dirs = ["anaconda3/pkgs", "miniconda3/pkgs", "miniforge3/pkgs", "mambaforge/pkgs", "micromamba/pkgs", ".conda/pkgs", "conda/pkgs"]
+explain = "Every package conda downloaded, kept so environments can share files. Old versions stay after you update or remove environments."
+fix = [{ label = "Remove unused packages and tarballs", run = "conda clean --all" }]
+
+[[rule]]
+id = "conda-envs"
+name = "Conda environments"
+category = "dev"
+safety = "review"
+dirs = ["anaconda3/envs", "miniconda3/envs", "miniforge3/envs", "mambaforge/envs", "micromamba/envs", ".conda/envs", "conda/envs"]
+explain = "Conda environments. Remove the ones you no longer use; each can hold several GB."
+fix = [
+  { label = "List environments", run = "conda env list" },
+  { label = "Remove one environment", run = "conda env remove -n NAME" },
+]
+
+[[rule]]
+id = "cargo-cache"
+name = "Rust crate downloads"
+category = "caches"
+safety = "regenerable"
+dirs = [".cargo/registry", ".cargo/git"]
+explain = "Crates and git dependencies Cargo downloaded. Cargo downloads them again when needed."
+
+[[rule]]
+id = "rust-target"
+name = "Rust build output"
+category = "dev"
+safety = "regenerable"
+dirs = ["target"]
+require_sibling = ["Cargo.toml"]
+explain = "Compiled output of a Rust project. Debug builds and incremental caches make it large; `cargo build` recreates it."
+fix = [{ label = "Delete it (run inside the project)", run = "cargo clean" }]
+
+[[rule]]
+id = "go-modcache"
+name = "Go module cache"
+category = "caches"
+safety = "regenerable"
+dirs = ["go/pkg/mod"]
+paths = ["$GOMODCACHE"]
+explain = "Source of every Go module version downloaded."
+fix = [{ label = "Clear the module cache", run = "go clean -modcache" }]
+
+[[rule]]
+id = "go-build-cache"
+name = "Go build cache"
+category = "caches"
+safety = "safe"
+dirs = [".cache/go-build"]
+explain = "Compiled packages cached by the Go toolchain."
+fix = [{ label = "Clear the build cache", run = "go clean -cache" }]
+
+[[rule]]
+id = "gradle-cache"
+name = "Gradle caches"
+category = "caches"
+safety = "regenerable"
+dirs = [".gradle/caches", ".gradle/wrapper/dists"]
+explain = "Dependencies and Gradle distributions downloaded by Gradle. Old versions are not always removed."
+
+[[rule]]
+id = "maven-repo"
+name = "Maven local repository"
+category = "caches"
+safety = "regenerable"
+dirs = [".m2/repository"]
+explain = "Every Maven dependency version downloaded. Maven downloads them again when needed."
+
+[[rule]]
+id = "ccache"
+name = "ccache compiler cache"
+category = "caches"
+safety = "safe"
+dirs = [".cache/ccache", ".ccache"]
+explain = "Cached C/C++ compiler output."
+fix = [
+  { label = "Clear the cache", run = "ccache -C" },
+  { label = "Limit it to 5 GB", run = "ccache -M 5G" },
+]
+
+[[rule]]
+id = "cmake-build"
+name = "CMake build folders"
+category = "dev"
+safety = "regenerable"
+dirs = ["build", "_build", "out", "cmake-build-*"]
+require_child = ["CMakeCache.txt"]
+explain = "Build output of CMake projects. Rebuilding recreates it."
+
+[[rule]]
+id = "bazel-cache"
+name = "Bazel cache"
+category = "caches"
+safety = "regenerable"
+dirs = [".cache/bazel"]
+explain = "Bazel's output base and download cache for all workspaces."
+fix = [{ label = "Delete a workspace's outputs (run inside it)", run = "bazel clean --expunge" }]
+
+[[rule]]
+id = "git-history"
+name = "Git repository history"
+category = "dev"
+safety = "caution"
+dirs = [".git"]
+require_child = ["HEAD"]
+explain = "The history of a Git repository. Never delete it unless you want to lose the history. `git gc` can compact it; large files committed in the past stay until the history is rewritten."
+fix = [{ label = "Compact the repository (run inside it)", run = "git gc" }]
+
+[[rule]]
+id = "editor-servers"
+name = "VS Code remote servers"
+category = "dev"
+safety = "review"
+dirs = [".vscode-server", ".vscode-server-insiders", ".cursor-server", ".windsurf-server"]
+explain = "Copies of VS Code (or Cursor, Windsurf) installed on this machine for remote sessions, with their extensions. Each editor update adds a new copy, and old copies are not always removed."
+tips = ["Old versions can be deleted while no remote window is connected; the editor reinstalls what it needs on the next connection."]
+
+[[rule]]
+id = "jetbrains-cache"
+name = "JetBrains IDE caches"
+category = "caches"
+safety = "safe"
+dirs = [".cache/JetBrains"]
+explain = "Indexes and caches of JetBrains IDEs. They are rebuilt when a project is opened."
+
+[[rule]]
+id = "browser-test-cache"
+name = "Browsers for testing (Playwright, Puppeteer)"
+category = "caches"
+safety = "regenerable"
+dirs = [".cache/ms-playwright", ".cache/puppeteer"]
+explain = "Browser builds downloaded for automated testing. They are downloaded again when needed, e.g. with `npx playwright install`."
+
+[[rule]]
+id = "android-sdk"
+name = "Android SDK and emulators"
+category = "dev"
+safety = "review"
+dirs = ["Android/Sdk", ".android/avd"]
+explain = "The Android SDK, system images and emulator disks. Remove system images and emulators you don't use from Android Studio's SDK and device managers."
+
+[[rule]]
+id = "haskell-tools"
+name = "Haskell toolchains and packages"
+category = "dev"
+safety = "regenerable"
+dirs = [".stack", ".cabal/packages", ".ghcup"]
+explain = "GHC versions and packages downloaded by Stack, Cabal or GHCup."
+
+[[rule]]
+id = "toolchain-versions"
+name = "Installed language versions"
+category = "dev"
+safety = "review"
+dirs = [".rustup/toolchains", ".nvm/versions", ".pyenv/versions", ".rbenv/versions", "rbenv/versions", ".sdkman/candidates", ".local/share/uv/python", ".volta/tools"]
+explain = "Several versions of a language toolchain installed by a version manager (rustup, nvm, pyenv, rbenv, SDKMAN!, uv). Each version is a full copy; remove the ones you no longer use with the manager that installed them."
+fix = [
+  { label = "Rust: list toolchains (remove one with rustup toolchain uninstall NAME)", run = "rustup toolchain list" },
+  { label = "Python via uv: list installed versions (remove one with uv python uninstall VERSION)", run = "uv python list --only-installed" },
+]
+
+[[rule]]
+id = "uv-tools"
+name = "Tools installed with uv or pipx"
+category = "dev"
+safety = "review"
+dirs = [".local/share/uv/tools", ".local/share/pipx/venvs", ".local/pipx/venvs"]
+explain = "Command-line tools installed in their own environments by uv tool or pipx."
+fix = [
+  { label = "List tools installed with uv", run = "uv tool list" },
+  { label = "List tools installed with pipx", run = "pipx list" },
+]
