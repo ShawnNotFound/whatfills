@@ -1,0 +1,39 @@
+[build-system]
+requires = ["scikit-build-core>=0.10", "nanobind>=2.0"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "whatfills"
+version = "0.1.0.dev0"
+description = "Find out why a disk is full: a fast scan that explains what is using the space and how to free it safely."
+readme = "README.md"
+requires-python = ">=3.9"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+keywords = ["disk usage", "du", "ncdu", "disk space", "cleanup", "sysadmin"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "Intended Audience :: System Administrators",
+  "Intended Audience :: Developers",
+  "Operating System :: POSIX :: Linux",
+  "Programming Language :: C++",
+  "Programming Language :: Python :: 3",
+  "Topic :: System :: Filesystems",
+  "Topic :: Utilities",
+]
+dependencies = ['tomli>=1.1; python_version < "3.11"']
+
+[project.urls]
+Homepage = "https://github.com/ShawnNotFound/whatfills"
+Issues = "https://github.com/ShawnNotFound/whatfills/issues"
+
+[tool.scikit-build]
+minimum-version = "build-system.requires"
+build-dir = "build/{wheel_tag}"
+wheel.packages = ["src/whatfills"]
+cmake.build-type = "Release"
+sdist.include = ["csrc/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
