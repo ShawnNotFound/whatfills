@@ -235,7 +235,8 @@ def _plan_mounts(root: str, root_mount, mounts, settings: Settings):
         if settings.one_file_system and (root_mount is None or m.dev != root_mount.dev):
             continue  # another filesystem: the scanner does not enter it
         if not settings.one_file_system and m.fstype in skip_types:
-            auto_skip[m.mount_point] = f"{m.fstype} filesystem"
+            special = m.fstype in fsinfo.PSEUDO_FSTYPES or m.fstype in fsinfo.DEFAULT_CROSS_SKIP_FSTYPES
+            auto_skip[m.mount_point] = f"{m.fstype} filesystem" if special else "excluded"
             continue
         if not settings.one_file_system and m.is_network:
             # Walking a big network share by accident can take hours and load
@@ -412,8 +413,8 @@ def _skip_reason(path: str, reason: str, auto_skip: dict, mount_types: dict) -> 
         fstype = mount_types.get(path, "")
         if fstype in fsinfo.NETWORK_FSTYPES:
             return f"{fstype} network filesystem"
-        if fstype in fsinfo.PSEUDO_FSTYPES or fstype in fsinfo.DEFAULT_CROSS_SKIP_FSTYPES:
-            return f"{fstype} filesystem"  # kernel, memory or image filesystems: not on this disk
+        if fstype:
+            return f"{fstype} filesystem"  # "mount" stays for one that was not mounted when the scan began
     return reason
 
 

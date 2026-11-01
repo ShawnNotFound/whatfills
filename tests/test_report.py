@@ -68,12 +68,16 @@ def test_skip_notes_are_grouped(result):
         ("/proc", "proc filesystem", 0),
         ("/run", "tmpfs filesystem", 0),
         ("/home", "mount", 7),
+        ("/boot/efi", "vfat filesystem", 8),
+        ("/data", "excluded", 9),
     ]
     out = " ".join(text(result).split())  # undo line wrapping
     assert "Did not count 2 bind mounts again" in out and "/srv/a is a bind mount of /x/a, counted there" in out
     assert "Did not enter 1 network filesystem: /mnt/nfs" in out
     assert "/proc" not in out and "/run" not in out  # kernel and memory filesystems are not worth a note
-    assert "Did not enter 1 other mounted filesystem: /home." in out
+    assert "Did not enter 2 other mounted filesystems: /boot/efi (vfat), /home. Use --cross-mounts" in out
+    assert "Excluded by your settings: /data." in out
+    assert report.hidden_checkable(result)
 
 
 def test_json_summary(result):

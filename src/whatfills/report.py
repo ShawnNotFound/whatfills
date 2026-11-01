@@ -9,7 +9,7 @@ import pwd
 import shlex
 import textwrap
 
-from . import __version__
+from . import __version__, fsinfo
 from .rules import CATEGORIES, SAFETY, UNCLASSIFIED
 from .scan import F_CHANGED, F_INCOMPLETE, F_PARTIAL, F_UNREADABLE, Folder, ScanResult
 from .term import Style, clip, display_width, home_short, shorten_middle, shorten_path, show
@@ -126,7 +126,7 @@ def _bar(frac: float, length: int) -> str:
 
 def hidden_checkable(r: ScanResult) -> bool:
     """Whether other filesystems are mounted inside the scanned one (so files could hide under them)."""
-    return any(why in ("mount", "subvolume") or _skip_kind(why) in ("special", "network", "bind") for _, why, _ in r.skips)
+    return any(_skip_kind(why) in ("mount", "subvolume", "special", "network", "bind") for _, why, _ in r.skips)
 
 
 def _plural(n: int, noun: str) -> str:
@@ -139,7 +139,10 @@ def _skip_kind(why: str) -> str:
     if why.endswith(" network filesystem"):
         return "network"
     if why.endswith(" filesystem"):
-        return "special"
+        fstype = why[: -len(" filesystem")]
+        # kernel, memory and image filesystems hold nothing on this disk
+        special = fstype in fsinfo.PSEUDO_FSTYPES or fstype in fsinfo.DEFAULT_CROSS_SKIP_FSTYPES
+        return "special" if special else "mount"
     return why
 
 
@@ -513,6 +516,8 @@ def render_text(r: ScanResult, style: Style, top: int = 10, cols: int = 100) -> 
         sample = ", ".join(show(p) for p in paths[:4]) + (", …" if len(paths) > 4 else "")
         n = len(paths)
         if kind == "mount":
+            typed = sorted((p, why[: -len(" filesystem")] if why.endswith(" filesystem") else "") for p, why in items)
+            sample = ", ".join(show(p) + (f" ({t})" if t else "") for p, t in typed[:4]) + (", …" if n > 4 else "")
             notes.append(f"Did not enter {_plural(n, 'other mounted filesystem')}: {sample}. "
                          f"Use --cross-mounts to include {'it' if n == 1 else 'them'}.")  # fmt: skip
         elif kind == "subvolume":

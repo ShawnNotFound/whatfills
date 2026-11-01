@@ -37,6 +37,9 @@ def test_plan_mounts_when_crossing():
     assert skip["/mnt/my disk"] == "fuse.sshfs network filesystem"
     assert "/home" not in skip and "/data" not in skip
     assert set(points) == {"/proc", "/home", "/srv/shared", "/mnt/my disk", "/data", "/run"}
+    # a type left out in the settings is listed as excluded, not as a kernel filesystem
+    _, skip = _plan_mounts("/", root_mount, mounts, Settings(one_file_system=False, exclude_fstypes=["xfs"]))
+    assert skip["/data"] == "excluded" and skip["/proc"] == "proc filesystem"
 
 
 def test_plan_mounts_one_filesystem_leaves_other_filesystems_to_the_scanner():
@@ -186,5 +189,6 @@ def test_skip_reasons_use_the_filesystem_type():
     assert _skip_reason("/proc", "mount", {}, types) == "proc filesystem"
     assert _skip_reason("/snap/core/1", "mount", {}, types) == "squashfs filesystem"
     assert _skip_reason("/mnt/nas", "mount", {}, types) == "nfs4 network filesystem"
-    assert _skip_reason("/home", "mount", {}, types) == "mount"
+    assert _skip_reason("/home", "mount", {}, types) == "ext4 filesystem"
+    assert _skip_reason("/media/usb", "mount", {}, types) == "mount"  # mounted after the scan began
     assert _skip_reason("/x", "excluded", {"/x": "bind mount of /y, counted there"}, types).startswith("bind mount")
