@@ -13,7 +13,7 @@ frees it. It never deletes anything itself.
 ```
 $ sudo whatfills /
 whatfills 0.1.0.dev0  / on ext4 (/dev/loop0, SSD)
-Scanned 82,229 files in 10,799 folders in 866 ms (normal effort, 16 threads, disk usage).
+Scanned 82,229 files in 10,799 folders in 555 ms (normal effort, 16 threads, disk usage).
 
 Disk
   54.8 GiB total, 49.4 GiB used, 2.6 GiB free for normal users  █████████████████████████████░░ 96%
@@ -33,7 +33,7 @@ Why it's full: space by cause
      3.3 GiB   7.3%  Docker container logs                      review
                      2 files, biggest /var/lib/docker/containers/14c2529e…/14c2529e…-json.log
      2.6 GiB   5.8%  Disk images (ISO)                          review
-                     /home/alex/…/ubuntu-24.04.1-live-server-amd64.iso (100% not used in 90+ days)
+                     …/Downloads/ubuntu-24.04.1-live-server-amd64.iso (100% not used in 90+ days)
   ...
   17.9 GiB (39.7%) is caches or files that can be rebuilt or downloaded again.
 
