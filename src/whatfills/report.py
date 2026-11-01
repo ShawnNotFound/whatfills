@@ -6,6 +6,7 @@ import datetime
 import errno as errno_mod
 import os
 import pwd
+import re
 import shlex
 import textwrap
 
@@ -124,9 +125,15 @@ def _short_file_path(path: str, room: int, folders: list) -> str:
     return shorten_path(shown, room)
 
 
+_SIZE = re.compile(r"(\d) (B|KiB|MiB|GiB|TiB|PiB)\b")
+
+
 def _wrap(text: str, w: int, **kw) -> list:
-    """textwrap.wrap that never splits a word, a path or a key like max-file."""
-    return textwrap.wrap(text, width=max(20, w), break_long_words=False, break_on_hyphens=False, **kw)
+    """textwrap.wrap that never splits a word, a path or a key like max-file,
+    or a size from its unit (247.1 MiB)."""
+    glued = _SIZE.sub("\\1\u00a0\\2", text)  # textwrap only breaks at ASCII whitespace
+    lines = textwrap.wrap(glued, width=max(20, w), break_long_words=False, break_on_hyphens=False, **kw)
+    return [x.replace("\u00a0", " ") for x in lines]
 
 
 def _para(text: str, w: int, indent: str = "  ", hang: str | None = None, style=None) -> list:

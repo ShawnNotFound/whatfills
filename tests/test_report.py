@@ -149,6 +149,14 @@ def test_cause_paths_keep_their_start(tmp_path, monkeypatch):
     assert not any("biggest …" in x for x in table) and all(len(x) <= 100 for x in table)
 
 
+def test_sizes_stay_with_their_units():
+    para = "Those files hold 247.1 MiB, and 512 B more. " * 8
+    for w in range(30, 90):
+        lines = report._wrap(para, w)
+        assert not any(x.endswith(("247.1", "512")) for x in lines)
+        assert "\u00a0" not in "".join(lines) and " ".join(lines) == para.strip()
+
+
 def test_shorten_path_keeps_the_file_name():
     from whatfills.term import shorten_path
 
