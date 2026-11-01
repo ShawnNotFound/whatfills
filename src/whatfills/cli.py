@@ -307,6 +307,8 @@ def cmd_rules(args) -> int:
         for key in ("paths", "dirs", "files", "within", "outside", "in_dirs", "require_child", "require_sibling"):
             if getattr(r, key):
                 print(f"  {key}: {', '.join(getattr(r, key))}")
+        if r.opaque:
+            print("  opaque: everything inside counts here; other folder rules do not match inside")
         if r.min_size:
             print(f"  min_size: {format_size(r.min_size)}")
         if r.explain:

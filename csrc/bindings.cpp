@@ -49,7 +49,7 @@ wf::Options parse_options(const nb::dict& d) {
                                 "keep_small_children", "big_file_min",
                                 "top_files", "matches_per_rule", "files_per_rule", "max_errors", "max_skips", "max_links",
                                 "dents_buffer", "now", "exclude_paths", "exclude_names", "exclude_globs",
-                                "mount_points", "dir_rules", "file_rules", "max_rule_id"};
+                                "mount_points", "dir_rules", "file_rules", "opaque_rules", "max_rule_id"};
   for (auto [k, v] : d) {
     std::string key = nb::cast<std::string>(k);
     if (std::find_if(std::begin(known), std::end(known), [&](const char* s) { return key == s; }) == std::end(known))
@@ -82,6 +82,7 @@ wf::Options parse_options(const nb::dict& d) {
   o.exclude_globs = bytes_list(d, "exclude_globs");
   o.mount_points = bytes_list(d, "mount_points");
   o.max_rule_id = get<int>(d, "max_rule_id", 0);
+  o.opaque_rules = int_list(d, "opaque_rules");
   if (d.contains("dir_rules")) {
     for (nb::handle h : d["dir_rules"]) {
       nb::dict r = nb::cast<nb::dict>(h);

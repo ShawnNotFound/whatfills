@@ -185,6 +185,11 @@ Scanner::Scanner(Options opt) : opt_(std::move(opt)) {
   for (const auto& r : opt_.file_rules) {
     if (r.id < 1 || r.id > opt_.max_rule_id) throw std::invalid_argument("file rule id out of range");
   }
+  opaque_.assign(static_cast<size_t>(opt_.max_rule_id) + 1, 0);
+  for (int id : opt_.opaque_rules) {
+    if (id < 1 || id > opt_.max_rule_id) throw std::invalid_argument("opaque rule id out of range");
+    opaque_[static_cast<size_t>(id)] = 1;
+  }
   for (const auto& r : opt_.dir_rules) {
     if (r.comp_glob.back()) {
       dir_wild_.push_back(&r);
@@ -419,6 +424,12 @@ bool Scanner::context_ok(const DirRule& r, int parent_fd, const std::string& par
 
 void Scanner::match_dir(Node* c, const Node* p, int parent_fd, const std::string& parent_path) {
   const int parent_eff = p ? p->eff_rule : 0;
+  if (opaque_[static_cast<size_t>(parent_eff)]) {
+    // Inside a folder that owns everything below it, nothing else matches.
+    c->eff_rule = parent_eff;
+    c->match_root = p->match_root;
+    return;
+  }
   std::string_view last = p ? std::string_view(c->name)
                             : (root_comps_.empty() ? std::string_view() : std::string_view(root_comps_.back()));
   // For the root node c->name is the full path, so context checks (made

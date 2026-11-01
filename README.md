@@ -232,11 +232,17 @@ explain = "Intermediate frames. The farm recreates them when a job is resubmitte
 fix = [{ label = "Clear frames older than a week", run = "find /srv/render/cache -mtime +7 -delete", root = true }]
 ```
 
+Folder rules can also require a name inside the folder
+(`require_child = ["HEAD"]`) or next to it (`require_sibling = ["Cargo.toml"]`).
+With `opaque = true` everything inside belongs to the rule: no other folder
+rule matches below it, so a `.git` or `build` folder inside `node_modules`
+counts as `node_modules`.
+
 File rules use `files = ["*.iso"]` instead of `paths` or `dirs`, and can add
-`min_size`, `within` or `outside` (ids of folder rules). Mistakes are reported
-with the file, the rule and a suggestion, for example
-`unknown key 'dirz' (did you mean 'dirs'?)`. The built-in rules are in
-[`src/whatfills/data/rules`](src/whatfills/data/rules).
+`min_size`, `within` or `outside` (ids of folder rules). They also apply
+inside opaque folders. Mistakes are reported with the file, the rule and a
+suggestion, for example `unknown key 'dirz' (did you mean 'dirs'?)`. The
+built-in rules are in [`src/whatfills/data/rules`](src/whatfills/data/rules).
 
 | Safety        | Meaning |
 |---------------|---------|

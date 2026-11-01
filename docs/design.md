@@ -111,6 +111,10 @@ Rules are compiled once into tables the scanner checks inline:
 - a folder without a match inherits its parent's cause, so a deeper match
   takes over below it: `~/.cache` is "Other app caches", but
   `~/.cache/pip` inside it is "pip download cache";
+- a rule marked `opaque` owns everything below its folders: no other folder
+  rule is tried inside, so a `.git` folder inside `node_modules`, or a
+  virtual environment inside a Docker image layer, stays with the folder
+  that holds it;
 - each file belongs to the first matching file rule, or else to its folder's
   cause.
 

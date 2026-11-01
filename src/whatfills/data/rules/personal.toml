@@ -106,6 +106,7 @@ name = "Steam games"
 category = "personal"
 safety = "review"
 dirs = [".local/share/Steam/steamapps", ".steam/steam/steamapps"]
+opaque = true
 explain = "Games installed by Steam. Uninstall games you don't play from Steam, or add a library folder on another disk in Steam's storage settings and move games there."
 
 [[rule]]
@@ -114,4 +115,5 @@ name = "Wine prefixes"
 category = "personal"
 safety = "review"
 dirs = [".wine"]
+opaque = true
 explain = "A Wine prefix: a Windows-style folder tree with the Windows programs installed in it."

@@ -20,5 +20,8 @@ First version.
 - Hard-linked files counted once, with a warning when deleting a cause would
   free less than its size.
 - Your own rules in TOML, checked with clear error messages.
+- Rules can own everything inside their folders (`opaque`), so what is inside
+  `node_modules`, a virtual environment, Docker's storage or a backup is not
+  split out as a separate cause.
 - Snapshots and `whatfills diff` to see what grew.
 - JSON output with a versioned schema.

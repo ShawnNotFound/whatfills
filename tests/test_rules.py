@@ -3,7 +3,7 @@
 import os
 
 import pytest
-from conftest import write
+from conftest import oracle, write
 
 from whatfills.config import Settings
 from whatfills.rules import (
@@ -36,6 +36,7 @@ def test_builtin_rules_load_and_compile():
     assert len(ids) == len(set(ids))
     compiled = RuleSet(rules).compile()
     assert compiled["dir_rules"] and compiled["file_rules"]
+    assert compiled["opaque_rules"]
 
 
 @pytest.mark.parametrize(
@@ -54,6 +55,8 @@ def test_builtin_rules_load_and_compile():
         ('[rule]\nid = "x"', "use [[rule]]"),
         ("this is = not toml", "not valid TOML"),
         ('[[rules]]\nid = "x"', "unknown top-level key 'rules' (did you mean 'rule'?)"),
+        ('[[rule]]\nid = "x"\nname = "X"\ndirs = ["a"]\nopaque = "yes"', "'opaque' must be true or false"),
+        ('[[rule]]\nid = "x"\nname = "X"\nfiles = ["*.a"]\nopaque = true', "'opaque' only applies to folder rules"),
     ],
 )
 def test_validation_messages(toml, message):
@@ -239,3 +242,53 @@ def test_rules_file_not_utf8(tmp_path):
     p.write_bytes(b'[[rule]]\nid = "x"\nname = "caf\xe9"\ndirs = ["a"]\n')
     with pytest.raises(RuleError, match="not UTF-8 text"):
         load_rules_file(str(p))
+
+
+OPAQUE_RULES = """
+[[rule]]
+id = "nm"
+name = "node_modules"
+dirs = ["node_modules"]
+opaque = true
+
+[[rule]]
+id = "git"
+name = "git"
+dirs = [".git"]
+require_child = ["HEAD"]
+
+[[rule]]
+id = "pycache"
+name = "bytecode"
+dirs = ["__pycache__"]
+
+[[rule]]
+id = "iso"
+name = "iso"
+files = ["*.iso"]
+min_size = "100K"
+"""
+
+
+def test_opaque_rule_owns_everything_inside(tmp_path):
+    nm = tmp_path / "proj" / "node_modules"
+    write(nm / "a.js", size=30_000)
+    write(nm / "pkg" / ".git" / "HEAD", size=20)
+    write(nm / "pkg" / ".git" / "objects" / "pack.pack", size=40_000)
+    write(nm / "pkg" / "__pycache__" / "x.pyc", size=10_000)
+    write(nm / "pkg" / "disk.iso", size=200_000)
+    write(tmp_path / "proj" / ".git" / "HEAD", size=20)
+    write(tmp_path / "proj" / "__pycache__" / "y.pyc", size=10_000)
+
+    r = scan(tmp_path, OPAQUE_RULES)
+    t = totals(r)
+    sizes = oracle(tmp_path)
+    assert sum(x.alloc for x in r.totals) == r.total_alloc
+    # Folder rules do not match inside node_modules, so its .git and
+    # __pycache__ count as node_modules; file rules still apply there.
+    assert [m.path for m in t["git"].locations] == [str(tmp_path / "proj" / ".git")]
+    assert [m.path for m in t["pycache"].locations] == [str(tmp_path / "proj" / "__pycache__")]
+    assert t["iso"].files == 1
+    (loc,) = t["nm"].locations
+    assert loc.alloc == sizes[str(nm)][0] - os.stat(nm / "pkg" / "disk.iso").st_blocks * 512
+

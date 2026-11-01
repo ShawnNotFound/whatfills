@@ -100,6 +100,7 @@ name = "Flatpak apps and runtimes"
 category = "packages"
 safety = "review"
 paths = ["/var/lib/flatpak", "~/.local/share/flatpak"]
+opaque = true
 explain = "Flatpak apps and the runtimes they need. Runtimes stay installed after the apps that used them are removed."
 fix = [{ label = "Remove runtimes that no app uses", run = "flatpak uninstall --unused" }]
 
@@ -109,6 +110,7 @@ name = "Docker images, containers and build cache"
 category = "containers"
 safety = "caution"
 paths = ["/var/lib/docker", "~/.local/share/docker"]
+opaque = true
 explain = "Everything Docker stores: images, containers, volumes and the build cache. Images and build cache pile up as you pull and build, and stopped containers and unused volumes stay until removed. Deleting files here by hand breaks Docker."
 fix = [
   { label = "See what Docker is using", run = "docker system df", root = true },
@@ -133,6 +135,7 @@ name = "containerd images and snapshots"
 category = "containers"
 safety = "caution"
 paths = ["/var/lib/containerd"]
+opaque = true
 explain = "Images and filesystem snapshots used by containerd, for example on Kubernetes nodes. Deleting files here by hand breaks the container runtime."
 fix = [{ label = "Remove unused images (Kubernetes nodes)", run = "crictl rmi --prune", root = true }]
 
@@ -142,6 +145,7 @@ name = "Podman images and containers"
 category = "containers"
 safety = "caution"
 paths = ["/var/lib/containers", "~/.local/share/containers"]
+opaque = true
 explain = "Images, containers and volumes stored by Podman (and Buildah). Deleting files here by hand breaks Podman."
 fix = [{ label = "Remove unused containers, images and build cache", run = "podman system prune" }]
 
@@ -264,6 +268,7 @@ name = "Trash"
 category = "trash"
 safety = "safe"
 dirs = [".local/share/Trash", ".Trash-*", ".Trash"]
+opaque = true
 explain = "Files you deleted in a file manager. They keep using disk space until the trash is emptied."
 fix = [{ label = "Empty your trash", run = "gio trash --empty" }]
 
@@ -273,6 +278,7 @@ name = "Timeshift snapshots"
 category = "backups"
 safety = "caution"
 paths = ["/timeshift", "/run/timeshift"]
+opaque = true
 explain = "System snapshots made by Timeshift. Delete old snapshots from Timeshift itself so it keeps its records straight."
 fix = [{ label = "List snapshots", run = "timeshift --list", root = true }]
 
@@ -282,6 +288,7 @@ name = "Snapper snapshots"
 category = "backups"
 safety = "caution"
 paths = ["/.snapshots"]
+opaque = true
 explain = "Btrfs snapshots made by snapper. They share data with the live system, so their real cost is the data that changed since each snapshot."
 fix = [{ label = "List snapshots", run = "snapper list", root = true }]
 
@@ -318,6 +325,7 @@ name = "Nix store"
 category = "packages"
 safety = "caution"
 paths = ["/nix/store"]
+opaque = true
 explain = "Every package version that Nix keeps for current and older generations."
 fix = [{ label = "Delete old generations and unused packages", run = "nix-collect-garbage -d", root = true, note = "You can no longer roll back to the deleted generations." }]
 
@@ -327,6 +335,7 @@ name = "Guix store"
 category = "packages"
 safety = "caution"
 paths = ["/gnu/store"]
+opaque = true
 explain = "Every package version that Guix keeps for current and older generations."
 fix = [{ label = "Collect garbage", run = "guix gc" }]
 

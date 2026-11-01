@@ -7,6 +7,7 @@ name = "node_modules folders"
 category = "dev"
 safety = "regenerable"
 dirs = ["node_modules"]
+opaque = true
 explain = "Packages installed for JavaScript or TypeScript projects. Every project has its own copy, so they add up quickly. Reinstall with npm, yarn or pnpm install when you work on the project again."
 
 [[rule]]
@@ -43,6 +44,7 @@ category = "dev"
 safety = "regenerable"
 dirs = [".venv", "venv", ".env", "env", "virtualenv", ".virtualenvs/*"]
 require_child = ["pyvenv.cfg"]
+opaque = true
 explain = "Python virtual environments. Each one holds its own copy of every installed package. Recreate one from the project's requirements when you need it again."
 
 [[rule]]
@@ -51,6 +53,7 @@ name = "tox / nox test environments"
 category = "dev"
 safety = "regenerable"
 dirs = [".tox", ".nox"]
+opaque = true
 explain = "Virtual environments created by tox or nox to run tests. They are rebuilt on the next run."
 
 [[rule]]
@@ -79,6 +82,7 @@ category = "caches"
 safety = "safe"
 dirs = [".cache/uv"]
 paths = ["$UV_CACHE_DIR"]
+opaque = true
 explain = "Packages uv downloaded and unpacked. It grows with every Python version and package version you install."
 fix = [
   { label = "Remove unused entries", run = "uv cache prune" },
@@ -91,6 +95,7 @@ name = "Poetry cache"
 category = "caches"
 safety = "safe"
 dirs = [".cache/pypoetry"]
+opaque = true
 explain = "Packages and virtual environments managed by Poetry. Poetry recreates them when needed."
 
 [[rule]]
@@ -99,6 +104,7 @@ name = "Conda package cache"
 category = "caches"
 safety = "safe"
 dirs = ["anaconda3/pkgs", "miniconda3/pkgs", "miniforge3/pkgs", "mambaforge/pkgs", "micromamba/pkgs", ".conda/pkgs", "conda/pkgs"]
+opaque = true
 explain = "Every package conda downloaded, kept so environments can share files. Old versions stay after you update or remove environments."
 fix = [{ label = "Remove unused packages and tarballs", run = "conda clean --all" }]
 
@@ -108,6 +114,7 @@ name = "Conda environments"
 category = "dev"
 safety = "review"
 dirs = ["anaconda3/envs", "miniconda3/envs", "miniforge3/envs", "mambaforge/envs", "micromamba/envs", ".conda/envs", "conda/envs"]
+opaque = true
 explain = "Conda environments. Remove the ones you no longer use; each can hold several GB."
 fix = [
   { label = "List environments", run = "conda env list" },
@@ -120,6 +127,7 @@ name = "Rust crate downloads"
 category = "caches"
 safety = "regenerable"
 dirs = [".cargo/registry", ".cargo/git"]
+opaque = true
 explain = "Crates and git dependencies Cargo downloaded. Cargo downloads them again when needed."
 
 [[rule]]
@@ -129,6 +137,7 @@ category = "dev"
 safety = "regenerable"
 dirs = ["target"]
 require_sibling = ["Cargo.toml"]
+opaque = true
 explain = "Compiled output of a Rust project. Debug builds and incremental caches make it large; `cargo build` recreates it."
 fix = [{ label = "Delete it (run inside the project)", run = "cargo clean" }]
 
@@ -139,6 +148,7 @@ category = "caches"
 safety = "regenerable"
 dirs = ["go/pkg/mod"]
 paths = ["$GOMODCACHE"]
+opaque = true
 explain = "Source of every Go module version downloaded."
 fix = [{ label = "Clear the module cache", run = "go clean -modcache" }]
 
@@ -186,6 +196,7 @@ category = "dev"
 safety = "regenerable"
 dirs = ["build", "_build", "out", "cmake-build-*"]
 require_child = ["CMakeCache.txt"]
+opaque = true
 explain = "Build output of CMake projects. Rebuilding recreates it."
 
 [[rule]]
@@ -194,6 +205,7 @@ name = "Bazel cache"
 category = "caches"
 safety = "regenerable"
 dirs = [".cache/bazel"]
+opaque = true
 explain = "Bazel's output base and download cache for all workspaces."
 fix = [{ label = "Delete a workspace's outputs (run inside it)", run = "bazel clean --expunge" }]
 
@@ -213,6 +225,7 @@ name = "VS Code remote servers"
 category = "dev"
 safety = "review"
 dirs = [".vscode-server", ".vscode-server-insiders", ".cursor-server", ".windsurf-server"]
+opaque = true
 explain = "Copies of VS Code (or Cursor, Windsurf) installed on this machine for remote sessions, with their extensions. Each editor update adds a new copy, and old copies are not always removed."
 tips = ["Old versions can be deleted while no remote window is connected; the editor reinstalls what it needs on the next connection."]
 
@@ -254,6 +267,7 @@ name = "Installed language versions"
 category = "dev"
 safety = "review"
 dirs = [".rustup/toolchains", ".nvm/versions", ".pyenv/versions", ".rbenv/versions", "rbenv/versions", ".sdkman/candidates", ".local/share/uv/python", ".volta/tools"]
+opaque = true
 explain = "Several versions of a language toolchain installed by a version manager (rustup, nvm, pyenv, rbenv, SDKMAN!, uv). Each version is a full copy; remove the ones you no longer use with the manager that installed them."
 fix = [
   { label = "Rust: list toolchains (remove one with rustup toolchain uninstall NAME)", run = "rustup toolchain list" },
@@ -266,6 +280,7 @@ name = "Tools installed with uv or pipx"
 category = "dev"
 safety = "review"
 dirs = [".local/share/uv/tools", ".local/share/pipx/venvs", ".local/pipx/venvs"]
+opaque = true
 explain = "Command-line tools installed in their own environments by uv tool or pipx."
 fix = [
   { label = "List tools installed with uv", run = "uv tool list" },

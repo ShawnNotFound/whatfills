@@ -93,6 +93,7 @@ struct Options {
   std::vector<std::string> mount_points;  // mount points under root, to tell mounts from btrfs subvolumes
   std::vector<DirRule> dir_rules;
   std::vector<FileRule> file_rules;
+  std::vector<int> opaque_rules;  // folder rules that own everything inside: no folder rule matches below them
   int max_rule_id = 0;
 };
 
@@ -279,6 +280,7 @@ class Scanner {
   std::unordered_set<std::string> mount_points_;
   std::unordered_map<std::string, std::vector<const DirRule*>> dir_by_last_;
   std::vector<const DirRule*> dir_wild_;
+  std::vector<char> opaque_;  // by rule id
   std::unordered_map<std::string, std::vector<std::pair<std::string, const FileRule*>>> file_by_ext_;
   std::vector<std::pair<std::string, const FileRule*>> file_generic_;
   bool any_file_rules_ = false;

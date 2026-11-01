@@ -65,7 +65,7 @@ CATEGORIES = {
 _ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 _RULE_KEYS = {
     "id", "name", "category", "safety", "explain", "paths", "dirs", "files", "min_size",
-    "within", "outside", "in_dirs", "require_child", "require_sibling", "fix", "tips",
+    "within", "outside", "in_dirs", "require_child", "require_sibling", "opaque", "fix", "tips",
 }  # fmt: skip
 _FIX_KEYS = {"label", "run", "root", "note"}
 
@@ -98,6 +98,7 @@ class Rule:
     in_dirs: list = field(default_factory=list)
     require_child: list = field(default_factory=list)
     require_sibling: list = field(default_factory=list)
+    opaque: bool = False  # no other folder rule matches inside its folders
     fixes: list = field(default_factory=list)
     tips: list = field(default_factory=list)
     source: str = ""
@@ -198,6 +199,11 @@ def _parse_rule(raw: dict, where: str, source: str) -> Rule:
     req_sib = _str_list(raw.get("require_sibling", []), where, "require_sibling")
     if (req_child or req_sib) and files:
         raise RuleError(f"{where}: 'require_child' and 'require_sibling' only apply to folder rules")
+    opaque = raw.get("opaque", False)
+    if not isinstance(opaque, bool):
+        raise RuleError(f"{where}: 'opaque' must be true or false")
+    if opaque and files:
+        raise RuleError(f"{where}: 'opaque' only applies to folder rules")
 
     fixes = []
     raw_fix = raw.get("fix", [])
@@ -224,7 +230,7 @@ def _parse_rule(raw: dict, where: str, source: str) -> Rule:
     return Rule(
         id=rid, name=name.strip(), category=category, safety=safety, explain=explain.strip(),
         paths=paths, dirs=dirs, files=files, min_size=min_size, within=within, outside=outside, in_dirs=in_dirs,
-        require_child=req_child, require_sibling=req_sib, fixes=fixes, tips=tips, source=source,
+        require_child=req_child, require_sibling=req_sib, opaque=opaque, fixes=fixes, tips=tips, source=source,
     )  # fmt: skip
 
 
@@ -444,7 +450,13 @@ class RuleSet:
                     "in_dirs": [enc(os.path.normpath(d)) for d in r.in_dirs],
                 }
             )
-        return {"dir_rules": dir_rules, "file_rules": file_rules, "max_rule_id": len(self.rules)}
+        opaque = [r.num for r in self.rules if r.opaque and r.kind == "folders"]
+        return {
+            "dir_rules": dir_rules,
+            "file_rules": file_rules,
+            "opaque_rules": opaque,
+            "max_rule_id": len(self.rules),
+        }
 
 
 def rules_dirs() -> list[str]:
