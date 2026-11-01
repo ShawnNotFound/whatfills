@@ -62,25 +62,33 @@ def _sudo(cmd: str, root: bool) -> str:
 
 
 def _where(r: ScanResult, t) -> tuple:
-    """(text, path) describing where a cause's space is; path may be shortened."""
+    """(count, path) describing where a cause's space is: how many folders or
+    files it is in (empty when there is one) and the biggest of them."""
     if t.rule is UNCLASSIFIED or t.rule.num == 0:
         return "see the largest folders below", ""
     if t.rule.kind == "files":
         if not t.top_files:
             return f"{format_count(t.files)} files", ""
         biggest = home_short(show(t.top_files[0].path))
-        return ("", biggest) if t.files == 1 else (f"{format_count(t.files)} files, biggest ", biggest)
+        return ("", biggest) if t.files == 1 else (f"{format_count(t.files)} files", biggest)
     if not t.locations:
         return "", ""
     biggest = home_short(show(t.locations[0].path))
-    if t.matches <= 1:
-        return "", biggest
-    return f"{format_count(t.matches)} folders, biggest ", biggest
+    return ("", biggest) if t.matches <= 1 else (f"{format_count(t.matches)} folders", biggest)
 
 
 def _where_text(r: ScanResult, t, room: int = 10_000) -> str:
-    text, path = _where(r, t)
-    return text + shorten_path(path, max(12, room - len(text)))
+    """_where as text of at most `room` columns; the path is shortened to fit,
+    or left out when only the count fits."""
+    count, path = _where(r, t)
+    if not path:
+        return count
+    if not count:
+        return shorten_path(path, room)
+    lead = f"{count}, biggest "
+    if display_width(lead) + 12 > room:
+        return count
+    return lead + shorten_path(path, room - display_width(lead))
 
 
 def _cause_folders(r: ScanResult) -> dict:
@@ -281,22 +289,30 @@ def render_text(r: ScanResult, style: Style, top: int = 10, cols: int = 100) -> 
         name = clip(name, name_w)
         safety = t.rule.safety if t.rule.num != 0 else ""
         old = old_share(r, t)
-        bits = []
+        extra = ""
         if t.rule.num != 0 and t.rule.safety != "caution" and old >= 0.5 and size(t) >= (1 << 30):
             verb = "used" if _use_atime(r) else "changed"
-            bits.append(f"{100 * old:.0f}% not {verb} in 90+ days")
-        if _shared_matters(t):
-            bits.append(f"{format_size(t.shared)} hard-linked elsewhere too")
-        extra = f" ({'; '.join(bits)})" if bits else ""
+            extra = f" ({100 * old:.0f}% not {verb} in 90+ days)"
         prefix = f"  {format_size(size(t)):>10}  {_pct(size(t), total)}  "
+        indent = " " * display_width(prefix)
         line = prefix + name + " " * (name_w - display_width(name)) + "  " + s.safety(safety, safety.ljust(11)) + "  "
         room = w - display_width(prefix) - name_w - 15 - len(extra)
         if room >= 32:
             out.append(line + s.dim(_where_text(r, t, room) + extra))
         else:
+            # Where the space is goes under the name, and the note after it
+            # if both fit, else on a line of its own.
             out.append(line.rstrip())
-            indent = " " * display_width(prefix)
-            out.append(indent + s.dim(_where_text(r, t, w - len(indent) - len(extra)) + extra))
+            room = w - len(indent)
+            if room - len(extra) >= 32:
+                out.append(indent + s.dim(_where_text(r, t, room - len(extra)) + extra))
+            else:
+                out.append(indent + s.dim(_where_text(r, t, room)))
+                if extra:
+                    out.append(indent + s.dim(extra.strip()))
+        if _shared_matters(t):
+            note = f"{format_size(t.shared)} of it is hard-linked from elsewhere, so deleting it frees less"
+            out += [indent + s.dim(x) for x in _wrap(note, w - len(indent))]
     if not rows:
         out.append("  Nothing found.")
     if safe_bytes and total:

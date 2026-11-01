@@ -54,7 +54,7 @@ def test_hard_link_sharing_is_explained(result):
     t.shared = 200 << 20
     result.links = {"cross_cause_bytes": 200 << 20, "untracked": 3, "table_limit": 100}
     out = " ".join(text(result).split())  # undo line wrapping
-    assert "200.0 MiB hard-linked elsewhere too" in out
+    assert "200.0 MiB of it is hard-linked from elsewhere, so deleting it frees less" in out
     assert "Deleting it frees less than this" in out
     assert "counted once, under the first place the scan reached" in out
     assert "3 hard links were found after the hard-link table was full" in out
@@ -99,6 +99,21 @@ def test_odd_file_names_are_escaped(tmp_path):
     r = run_scan(str(tmp_path), Settings(), RuleSet([], homes=[]))
     out = text(r)
     assert "\x1b" not in out and "\\x1b" in out
+
+
+def test_cause_rows_fit_the_width(result, monkeypatch):
+    t = next(x for x in result.totals if x.rule.id == "pkgs")
+    t.alloc, t.shared, t.matches = 3 << 30, 1 << 30, 1234
+    t.rule.name = "A rather long name for a cause"
+    monkeypatch.setattr(report, "old_share", lambda r, t: 1.0)
+    for cols in (60, 80, 100, 160):
+        lines = text(result, cols=cols).splitlines()
+        table = lines[lines.index("Why it's full: space by cause") + 1 :]
+        table = table[: table.index("")]
+        assert [x for x in table if len(x) > cols] == []
+        joined = " ".join(" ".join(table).split())
+        assert "1,234 folders" in joined and "100% not" in joined and "in 90+ days" in joined
+        assert "1.0 GiB of it is hard-linked from elsewhere, so deleting it frees less" in joined
 
 
 def test_shorten_path_keeps_the_file_name():
