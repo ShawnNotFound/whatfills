@@ -83,6 +83,22 @@ def _where_text(r: ScanResult, t, room: int = 10_000) -> str:
     return text + shorten_path(path, max(12, room - len(text)))
 
 
+def _cause_folders(r: ScanResult) -> dict:
+    """Rule number -> the folders it matched, deepest first."""
+    return {t.rule.num: sorted((m.path for m in t.locations), key=len, reverse=True) for t in r.totals if t.locations}
+
+
+def _short_file_path(path: str, room: int, folders: list) -> str:
+    """A file's path for display. When it is inside a folder that explains it
+    (a virtual environment, a model cache), that folder is kept in view if
+    there is room."""
+    shown = home_short(show(path))
+    for d in folders:
+        if path.startswith(d.rstrip("/") + "/"):
+            return shorten_path(shown, room, keep=len([x for x in home_short(show(d)).split("/") if x]))
+    return shorten_path(shown, room)
+
+
 def _wrap(text: str, w: int, **kw) -> list:
     """textwrap.wrap that never splits a word, a path or a key like max-file."""
     return textwrap.wrap(text, width=max(20, w), break_long_words=False, break_on_hyphens=False, **kw)
@@ -354,11 +370,12 @@ def render_text(r: ScanResult, style: Style, top: int = 10, cols: int = 100) -> 
         ages = [format_age(max(0, now - f.mtime)) for f in r.top_files[:top]]
         age_w = max(len(a) for a in ages)
         who_w = max(len(user_name(f.uid)) for f in r.top_files[:top])
+        cause_folders = _cause_folders(r)
         for f, age in zip(r.top_files[:top], ages):
             who = f"  {user_name(f.uid):<{who_w}}" if len(owners) > 1 else ""
             prefix = f"  {format_size(size(f)):>10}  {age:>{age_w}}{who}  "
             room = max(10, w - display_width(prefix))
-            out.append(prefix + shorten_path(home_short(show(f.path)), room))
+            out.append(prefix + _short_file_path(f.path, room, cause_folders.get(f.rule, [])))
         out.append(s.dim("  (age = time since the file was last changed)"))
         out.append("")
 

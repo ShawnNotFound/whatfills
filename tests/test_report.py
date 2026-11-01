@@ -106,8 +106,9 @@ def test_shorten_path_keeps_the_file_name():
 
     p = "/home/alex/Downloads/ubuntu-24.04.1-live-server-amd64.iso"
     assert shorten_path(p, 100) == p
-    short = shorten_path(p, 50)
-    assert short.endswith("/…/ubuntu-24.04.1-live-server-amd64.iso") and len(short) <= 50
+    # the folders right above the file come first, then the start of the path
+    assert shorten_path(p, 50) == "…/Downloads/ubuntu-24.04.1-live-server-amd64.iso"
+    assert shorten_path(p, 56) == "…/alex/Downloads/ubuntu-24.04.1-live-server-amd64.iso"
     assert shorten_path("/a/" + "x" * 80, 40).count("…") == 1  # a name too long to keep whole is cut in the middle
 
 
@@ -117,13 +118,44 @@ def test_shorten_path_drops_folders_from_the_middle():
     blob = "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
     hf = "/home/alex/.cache/huggingface/hub/models--Qwen--Qwen2.5-3B-Instruct/blobs/" + blob
     # hashes are cut to their start, and the folders right above the file are kept
-    assert shorten_path(hf, 65) == "/home/alex/…/models--Qwen--Qwen2.5-3B-Instruct/blobs/6b86b273…"
+    assert shorten_path(hf, 65) == "/home/…/hub/models--Qwen--Qwen2.5-3B-Instruct/blobs/6b86b273…"
     log = f"/var/lib/docker/containers/{blob}/{blob}-json.log"
     assert shorten_path(log, 60) == "/var/lib/docker/containers/6b86b273…/6b86b273…-json.log"
     assert shorten_path(log, 200) == log  # nothing changes when it fits
     wide = "/srv/数据/训练集/很长的文件夹名字/模型权重文件.bin"
     assert display_width(shorten_path(wide, 30)) <= 30
-    assert shorten_path("rel/a/b/c/d/e/file.txt", 18) == "rel/a/…/e/file.txt"
+    assert shorten_path("rel/a/b/c/d/e/file.txt", 18) == "…/b/c/d/e/file.txt"
+    deep = "/" + "/".join(["d"] * 3000) + "/f.bin"
+    assert display_width(shorten_path(deep, 60)) <= 60
+
+
+def test_shorten_path_keeps_a_chosen_folder():
+    from whatfills.term import shorten_path
+
+    blob = "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+    hf = "/home/alex/.cache/huggingface/hub/models--Qwen--Qwen2.5-3B-Instruct/blobs/" + blob
+    assert shorten_path(hf, 65, keep=4) == "…/huggingface/…/models--Qwen--Qwen2.5-3B-Instruct/blobs/6b86b273…"
+    lib = "~/GitHub/contrib/.venv-tvm-relax/lib/python3.13/site-packages/torch/lib/libtorch_cpu.so"
+    plain = shorten_path(lib, 60)
+    assert ".venv-tvm-relax" not in plain
+    assert shorten_path(lib, 60, keep=4) == "…/.venv-tvm-relax/…/site-packages/torch/lib/libtorch_cpu.so"
+    # the file's own folder, the file itself or past the end: nothing to add
+    for keep in (-1, 0, 9, 10, 99):
+        assert shorten_path(lib, 60, keep=keep) == plain
+    assert shorten_path(lib, 30, keep=4) == "~/…/torch/lib/libtorch_cpu.so"  # no room for it
+
+
+def test_largest_files_show_the_environment_they_are_in(tmp_path):
+    env = tmp_path / "work" / "projects" / "contrib" / ".venv-tvm-relax"
+    write(env / "pyvenv.cfg", size=100)
+    write(env / "lib" / "python3.13" / "site-packages" / "torch" / "lib" / "libtorch_cpu.so", size=400_000)
+    write(tmp_path / "work" / "notes" / "a" / "b" / "c" / "d" / "e" / "f" / "g" / "notes.txt", size=200_000)
+    r = run_scan(str(tmp_path), Settings(), RuleSet(builtin_rules(), homes=[]))
+    lines = text(r, cols=80).splitlines()
+    files = lines[lines.index("Largest files") + 1 :]
+    torch = next(x for x in files if x.endswith("libtorch_cpu.so"))
+    assert "/.venv-tvm-relax/…/" in torch and len(torch) <= 80
+    assert next(x for x in files if x.endswith("notes.txt")).count("…") == 1
 
 
 def test_tree_names_the_cause_that_holds_the_space(tmp_path):

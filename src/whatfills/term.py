@@ -107,12 +107,17 @@ def shorten_middle(text: str, limit: int) -> str:
 _HEX_RUN = re.compile(r"[0-9a-f]{20,}|[0-9A-F]{20,}")
 
 
-def shorten_path(path: str, limit: int) -> str:
+def shorten_path(path: str, limit: int, keep: int = 0) -> str:
     """Shorten a path to `limit` columns. Long hex ids (content hashes,
     container and machine ids) are cut to their start first. Then folders are
-    left out of the middle, keeping the first two, the last part whole, and
-    as many of the folders just above it as fit:
-    /home/alex/…/models--Qwen--Qwen2.5-3B/blobs/6b86b273…"""
+    left out, each run of them shown as "…", and the last part stays whole
+    (if it alone is too long, the middle of the path is cut instead).
+
+    Folders are kept in this order, as far as they fit: the ones just above
+    the last part, then the first part and those after it. With `keep`, the
+    folder made of the first `keep` parts (the folder that explains a file,
+    say) comes first, and the folders just above it come before the start of
+    the path: …/huggingface/…/models--Qwen--Qwen2.5-3B/blobs/6b86b273…"""
     if display_width(path) <= limit or limit < 8:
         return path
     path = _HEX_RUN.sub(lambda m: m.group(0)[:8] + "…", path)
@@ -120,26 +125,41 @@ def shorten_path(path: str, limit: int) -> str:
         return path
     lead = "/" if path.startswith("/") else ""
     parts = [x for x in path.split("/") if x]
-    if len(parts) < 2 or display_width(parts[-1]) + 4 > limit:
+    n = len(parts)
+    if n < 2 or display_width(parts[-1]) + 2 > limit:
         return shorten_middle(path, limit)
-    head, tail = parts[: min(2, len(parts) - 1)], parts[-1:]
-    rest = parts[len(head) : -1]  # folders that may be left out
+    shown = [False] * n
+    shown[-1] = True
 
-    def fits(h: list, t: list) -> bool:
-        return display_width(lead + "/".join(h)) + 3 + display_width("/".join(t)) <= limit
+    def render() -> str:
+        out, gap = [], False
+        for part, s in zip(parts, shown):
+            if s:
+                out += ["…", part] if gap else [part]
+                gap = False
+            else:
+                gap = True
+        return (lead if shown[0] else "") + "/".join(out)
 
-    while head and not fits(head, tail):
-        rest.insert(0, head.pop())
-    i, j = len(rest), 0  # rest[j:i] is left out
-    while i > j and fits(head, rest[i - 1 : i] + tail):
-        i -= 1
-        tail.insert(0, rest[i])
-    while j < i and fits(head + rest[j : j + 1], tail):
-        head.append(rest[j])
-        j += 1
-    if j >= i:
-        return lead + "/".join(head + tail)
-    return (lead + "/".join(head) + "/…/" if head else lead + "…/") + "/".join(tail)
+    def add(i: int) -> bool:
+        if shown[i]:
+            return True
+        shown[i] = True
+        if display_width(render()) <= limit:
+            return True
+        shown[i] = False
+        return False
+
+    anchor = keep - 1 if 0 < keep < n - 1 else -1
+    runs = [range(n - 2, anchor, -1)]  # the folders just above the last part
+    if anchor >= 0 and add(anchor):
+        runs.append(range(anchor - 1, -1, -1))  # the folders just above the kept one
+    runs.append(range(n - 1))  # the first part and those after it
+    for run in runs:
+        for i in run:
+            if not add(i):
+                break
+    return render()
 
 
 def home_short(path: str) -> str:
