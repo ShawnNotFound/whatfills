@@ -132,6 +132,23 @@ def test_cause_rows_fit_the_width(result, monkeypatch):
         assert "1.0 GiB of it is hard-linked from elsewhere, so deleting it frees less" in joined
 
 
+def test_cause_paths_keep_their_start(tmp_path, monkeypatch):
+    home = tmp_path / "home" / "shawn"
+    monkeypatch.setenv("HOME", str(home))
+    contrib = home / "GitHub" / "contrib"
+    for i, name in enumerate([".venv-tvm-relax", ".venv-tvm", ".venv-onnx"]):
+        write(contrib / name / "pyvenv.cfg", size=10)
+        write(contrib / name / "lib.so", size=300_000 - i * 50_000)
+    write(contrib / "h5py" / ".tox" / "py313" / "x.so", size=100_000)
+    r = run_scan(str(home / "GitHub"), Settings(), RuleSet(builtin_rules(), homes=[]))
+    lines = text(r, cols=100).splitlines()
+    table = lines[lines.index("Why it's full: space by cause") + 1 :]
+    table = table[: table.index("")]
+    # no room for "~/…/.venv-tvm-relax" next to the name, so it goes on the next line
+    assert "3 folders, biggest ~/GitHub/contrib/.venv-tvm-relax" in table[1]
+    assert not any("biggest …" in x for x in table) and all(len(x) <= 100 for x in table)
+
+
 def test_shorten_path_keeps_the_file_name():
     from whatfills.term import shorten_path
 

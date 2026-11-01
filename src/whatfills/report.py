@@ -77,18 +77,20 @@ def _where(r: ScanResult, t) -> tuple:
     return ("", biggest) if t.matches <= 1 else (f"{format_count(t.matches)} folders", biggest)
 
 
-def _where_text(r: ScanResult, t, room: int = 10_000) -> str:
+def _where_text(r: ScanResult, t, room: int = 10_000, strict: bool = False) -> str | None:
     """_where as text of at most `room` columns; the path is shortened to fit,
-    or left out when only the count fits."""
+    or left out when only the count fits. With `strict`, None instead when the
+    path would be left out or lose its start ("~" or "/")."""
     count, path = _where(r, t)
     if not path:
         return count
-    if not count:
-        return shorten_path(path, room)
-    lead = f"{count}, biggest "
-    if display_width(lead) + 12 > room:
-        return count
-    return lead + shorten_path(path, room - display_width(lead))
+    lead = f"{count}, biggest " if count else ""
+    if lead and display_width(lead) + 12 > room:
+        return None if strict else count
+    short = shorten_path(path, room - display_width(lead))
+    if strict and path[0] in "~/" and short[0] not in "~/":
+        return None
+    return lead + short
 
 
 def _has_own_name(rule, folder: str) -> bool:
@@ -316,8 +318,9 @@ def render_text(r: ScanResult, style: Style, top: int = 10, cols: int = 100) -> 
         indent = " " * display_width(prefix)
         line = prefix + name + " " * (name_w - display_width(name)) + "  " + s.safety(safety, safety.ljust(11)) + "  "
         room = w - display_width(prefix) - name_w - 15 - len(extra)
-        if room >= 32:
-            out.append(line + s.dim(_where_text(r, t, room) + extra))
+        where = _where_text(r, t, room, strict=True) if room >= 32 else None
+        if where is not None:
+            out.append(line + s.dim(where + extra))
         else:
             # Where the space is goes under the name, and the note after it
             # if both fit, else on a line of its own.
