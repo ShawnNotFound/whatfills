@@ -6,7 +6,7 @@ First version.
 
 - Parallel scanner in C++ (`getdents64` and `statx`) with bounded memory:
   totals for every folder, detail only for the ones that matter.
-- 84 built-in rules that explain space by cause, each with a safety rating
+- 85 built-in rules that explain space by cause, each with a safety rating
   and the cleanup command of the tool that owns the data.
 - Explains the difference between `df` and the scan: reserved blocks,
   deleted files still held open, files hidden under mount points (as root),
@@ -23,5 +23,10 @@ First version.
 - Rules can own everything inside their folders (`opaque`), so what is inside
   `node_modules`, a virtual environment, Docker's storage or a backup is not
   split out as a separate cause.
+- Virtual environments and conda environments are found by what they hold
+  (`pyvenv.cfg`, `conda-meta`), whatever the folder is called, and a conda
+  installation is told apart from its environments. The check uses each
+  folder's own listing, so it costs no extra lookups except in very large
+  folders.
 - Snapshots and `whatfills diff` to see what grew.
 - JSON output with a versioned schema.

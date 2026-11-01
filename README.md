@@ -75,7 +75,7 @@ When a server has just run out of space, the next questions are usually what
 the bytes are, whether they are safe to delete, and why `df` says the disk is
 full when `du` finds less. That is what whatfills is for.
 
-- **Causes, not just folders.** 84 built-in rules recognise system logs,
+- **Causes, not just folders.** 85 built-in rules recognise system logs,
   package manager caches, snap revisions, Docker and other container storage,
   crash dumps, old kernels, databases, language and build caches, ML model
   caches and personal folders. Every byte is counted under exactly one cause,
@@ -234,9 +234,12 @@ fix = [{ label = "Clear frames older than a week", run = "find /srv/render/cache
 
 Folder rules can also require a name inside the folder
 (`require_child = ["HEAD"]`) or next to it (`require_sibling = ["Cargo.toml"]`).
-With `opaque = true` everything inside belongs to the rule: no other folder
-rule matches below it, so a `.git` or `build` folder inside `node_modules`
-counts as `node_modules`.
+With `dirs = ["*"]` and `require_child`, a rule matches any folder that holds
+that name, whatever the folder is called. That is how virtual environments
+(`pyvenv.cfg`) and conda environments (`conda-meta`) are found. With
+`opaque = true` everything inside belongs to the rule: no other folder rule
+matches below it, so a `.git` or `build` folder inside `node_modules` counts
+as `node_modules`.
 
 File rules use `files = ["*.iso"]` instead of `paths` or `dirs`, and can add
 `min_size`, `within` or `outside` (ids of folder rules). They also apply

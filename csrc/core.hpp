@@ -251,6 +251,10 @@ class Scanner {
   int open_dir(const Node* n, const std::string& path);
   int do_stat(int dirfd, const char* name, Stat& st);
   void match_dir(Node* c, const Node* parent, int parent_fd, const std::string& parent_path);
+  long match_markers(Node* n, int fd, char* buf, size_t bufsz, bool& eof, ThreadState& ts);
+  const DirRule* markers_in(const char* buf, long len, const Node* n, int limit, int inherited) const;
+  bool marker_applies(const DirRule& r, const Node* n, int limit, int inherited) const;
+  void claim_by_marker(Node* n, const DirRule& r, ThreadState& ts);
   bool dir_rule_matches(const DirRule& r, const Node* c) const;
   bool context_ok(const DirRule& r, int parent_fd, const std::string& parent_path, std::string_view name) const;
   int match_file(std::string_view name, uint64_t alloc, int dir_rule, const std::string& dir_path) const;
@@ -280,7 +284,14 @@ class Scanner {
   std::unordered_set<std::string> mount_points_;
   std::unordered_map<std::string, std::vector<const DirRule*>> dir_by_last_;
   std::vector<const DirRule*> dir_wild_;
-  std::vector<char> opaque_;  // by rule id
+  // Rules for "any folder that holds one of these names" (dirs = ["*"] with
+  // require_child). They are checked against the entries of a folder as it is
+  // read, so they cost no lookups.
+  std::vector<const DirRule*> dir_marker_;
+  std::vector<std::pair<std::string, const DirRule*>> marker_names_;
+  bool marker_first_[256] = {};  // first bytes of marker names, a cheap filter
+  std::vector<int> rule_order_;  // best order of each folder rule's patterns, by rule id
+  std::vector<char> opaque_;     // by rule id
   std::unordered_map<std::string, std::vector<std::pair<std::string, const FileRule*>>> file_by_ext_;
   std::vector<std::pair<std::string, const FileRule*>> file_generic_;
   bool any_file_rules_ = false;

@@ -185,13 +185,30 @@ Scanner::Scanner(Options opt) : opt_(std::move(opt)) {
   for (const auto& r : opt_.file_rules) {
     if (r.id < 1 || r.id > opt_.max_rule_id) throw std::invalid_argument("file rule id out of range");
   }
-  opaque_.assign(static_cast<size_t>(opt_.max_rule_id) + 1, 0);
+  const size_t nrules = static_cast<size_t>(opt_.max_rule_id) + 1;
+  rule_order_.assign(nrules, INT_MAX);
+  opaque_.assign(nrules, 0);
   for (int id : opt_.opaque_rules) {
     if (id < 1 || id > opt_.max_rule_id) throw std::invalid_argument("opaque rule id out of range");
     opaque_[static_cast<size_t>(id)] = 1;
   }
   for (const auto& r : opt_.dir_rules) {
-    if (r.comp_glob.back()) {
+    rule_order_[static_cast<size_t>(r.id)] = std::min(rule_order_[static_cast<size_t>(r.id)], r.order);
+    // A rule for any folder name that only needs a name inside the folder is
+    // checked from the folder's own entries (plain names only; a child path
+    // like "bin/python" needs a lookup, so such rules are checked the usual way).
+    const bool any_name = !r.anchored && r.comps.size() == 1 && r.comps[0] == "*";
+    const bool plain_children =
+        !r.require_child.empty() && std::all_of(r.require_child.begin(), r.require_child.end(), [](const std::string& c) {
+          return !c.empty() && c.find('/') == std::string::npos;
+        });
+    if (any_name && plain_children && r.require_sibling.empty()) {
+      dir_marker_.push_back(&r);
+      for (const auto& ch : r.require_child) {
+        marker_names_.emplace_back(ch, &r);
+        marker_first_[static_cast<unsigned char>(ch[0])] = true;
+      }
+    } else if (r.comp_glob.back()) {
       dir_wild_.push_back(&r);
     } else {
       dir_by_last_[r.comps.back()].push_back(&r);
@@ -199,6 +216,7 @@ Scanner::Scanner(Options opt) : opt_(std::move(opt)) {
   }
   auto by_order = [](const DirRule* a, const DirRule* b) { return a->order < b->order; };
   std::sort(dir_wild_.begin(), dir_wild_.end(), by_order);
+  std::sort(dir_marker_.begin(), dir_marker_.end(), by_order);
   for (auto& kv : dir_by_last_) std::sort(kv.second.begin(), kv.second.end(), by_order);
 
   for (const auto& r : opt_.file_rules) {
@@ -467,6 +485,121 @@ void Scanner::match_dir(Node* c, const Node* p, int parent_fd, const std::string
   }
 }
 
+bool Scanner::marker_applies(const DirRule& r, const Node* n, int limit, int inherited) const {
+  // A rule that matched the folder by its path keeps it unless the marker rule
+  // comes first. A marker of the rule the folder already belongs to changes
+  // nothing, so an environment inside another one stays part of it.
+  return r.order < limit && r.id != inherited && r.id != n->match_rule;
+}
+
+const DirRule* Scanner::markers_in(const char* buf, long len, const Node* n, int limit, int inherited) const {
+  const DirRule* best = nullptr;
+  for (long pos = 0; pos < len;) {
+    const auto* d = reinterpret_cast<const wf_dirent64*>(buf + pos);
+    pos += d->d_reclen;
+    const char* nm = d->d_name;
+    if (!marker_first_[static_cast<unsigned char>(nm[0])]) continue;
+    for (const auto& [name, r] : marker_names_) {
+      if ((best == nullptr || r->order < best->order) && name == nm && marker_applies(*r, n, limit, inherited))
+        best = r;
+    }
+  }
+  return best;
+}
+
+long Scanner::match_markers(Node* n, int fd, char* buf, size_t bufsz, bool& eof, ThreadState& ts) {
+  if (dir_marker_.empty()) return 0;
+  const bool here = (n->flags & F_MATCH) != 0;
+  const int inherited = here ? n->outer_rule : n->eff_rule;
+  if (opaque_[static_cast<size_t>(inherited)]) return 0;
+  const int limit = here ? rule_order_[static_cast<size_t>(n->match_rule)] : INT_MAX;
+  const DirRule* first = nullptr;  // the best rule that could apply here
+  for (const DirRule* r : dir_marker_) {
+    if (marker_applies(*r, n, limit, inherited)) {
+      first = r;
+      break;
+    }
+  }
+  if (first == nullptr) return 0;
+
+  auto read = [fd](char* b, size_t sz) {
+    long got;
+    do {
+      got = syscall(SYS_getdents64, fd, b, sz);
+    } while (got < 0 && errno == EINTR);
+    return got;
+  };
+  long len = read(buf, bufsz);
+  if (len <= 0) {
+    if (len == 0) eof = true;
+    return len;
+  }
+  const DirRule* best = markers_in(buf, len, n, limit, inherited);
+  if (best != first) {
+    // A better rule could still match further on. Read on into the rest of
+    // the buffer; for almost every folder this read finds the end, and the
+    // main loop would have made it anyway.
+    bool complete = false;
+    const size_t room = bufsz - static_cast<size_t>(len);
+    if (room >= 4096) {
+      const long more = read(buf + len, room);
+      if (more == 0) {
+        complete = eof = true;
+      } else if (more > 0) {
+        const DirRule* b2 = markers_in(buf + len, more, n, limit, inherited);
+        if (b2 != nullptr && (best == nullptr || b2->order < best->order)) best = b2;
+        len += more;
+      }
+      // After a read error the main loop reads again and reports it.
+    }
+    if (!complete) {
+      // A long listing: look the remaining names up instead.
+      const int upto = best != nullptr ? best->order : INT_MAX;
+      struct stat st;
+      for (const DirRule* r : dir_marker_) {
+        if (r->order >= upto) break;
+        if (!marker_applies(*r, n, limit, inherited)) continue;
+        const bool found = std::any_of(r->require_child.begin(), r->require_child.end(), [&](const std::string& ch) {
+          return fstatat(fd, ch.c_str(), &st, AT_SYMLINK_NOFOLLOW | AT_NO_AUTOMOUNT) == 0;
+        });
+        if (found) {
+          best = r;
+          break;
+        }
+      }
+    }
+  }
+  if (best != nullptr) claim_by_marker(n, *best, ts);
+  return len;
+}
+
+void Scanner::claim_by_marker(Node* n, const DirRule& r, ThreadState& ts) {
+  // Nothing inside n is counted yet, only the folder's own size: move it to
+  // the new rule. Per-thread totals may wrap below zero here; their sums over
+  // all threads are what is reported, and those stay exact.
+  const uint64_t own = n->alloc.load(std::memory_order_relaxed);
+  const uint64_t own_app = n->apparent.load(std::memory_order_relaxed);
+  RuleAcc& from = ts.rules[static_cast<size_t>(n->eff_rule)];
+  RuleAcc& to = ts.rules[static_cast<size_t>(r.id)];
+  from.alloc -= own;
+  from.apparent -= own_app;
+  to.alloc += own;
+  to.apparent += own_app;
+  if (n->match_root != n) {
+    if (n->match_root != nullptr) {
+      n->match_root->attr_alloc.fetch_sub(own, std::memory_order_relaxed);
+      n->match_root->attr_apparent.fetch_sub(own_app, std::memory_order_relaxed);
+    }
+    n->attr_alloc.store(own, std::memory_order_relaxed);
+    n->attr_apparent.store(own_app, std::memory_order_relaxed);
+    n->outer_rule = n->eff_rule;
+    n->match_root = n;
+    n->flags |= F_MATCH;
+  }
+  n->match_rule = r.id;
+  n->eff_rule = r.id;
+}
+
 int Scanner::match_file(std::string_view name, uint64_t alloc, int dir_rule, const std::string& dir_path) const {
   const FileRule* best = nullptr;
   auto ok = [&](const FileRule* r) {
@@ -723,17 +856,35 @@ void Scanner::process_dir(Node* n, ThreadState& ts) {
   const size_t bufsz = ts.buf.size();
   bool stopped = false;
 
+  // Rules that recognise a folder by a name inside it look at the start of the
+  // listing before any entry is counted, so the entries go to the right cause.
+  bool eof = false;
+  long pending = match_markers(n, fd, buf, bufsz, eof, ts);
+  if (pending < 0) {
+    const int e = errno;
+    n->flags |= F_PARTIAL;
+    n->err = e;
+    add_error(ts, path, e, "list");
+    pending = 0;
+    eof = true;
+  }
+
   for (;;) {
-    const long nread = syscall(SYS_getdents64, fd, buf, bufsz);
-    if (nread < 0) {
-      const int e = errno;
-      if (e == EINTR) continue;
-      n->flags |= F_PARTIAL;
-      n->err = e;
-      add_error(ts, path, e, "list");
-      break;
+    long nread = pending;
+    pending = 0;
+    if (nread == 0) {
+      if (eof) break;
+      nread = syscall(SYS_getdents64, fd, buf, bufsz);
+      if (nread < 0) {
+        const int e = errno;
+        if (e == EINTR) continue;
+        n->flags |= F_PARTIAL;
+        n->err = e;
+        add_error(ts, path, e, "list");
+        break;
+      }
+      if (nread == 0) break;
     }
-    if (nread == 0) break;
     for (long pos = 0; pos < nread;) {
       auto* d = reinterpret_cast<wf_dirent64*>(buf + pos);
       pos += d->d_reclen;

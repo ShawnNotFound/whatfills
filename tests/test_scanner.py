@@ -12,6 +12,7 @@ import pytest
 from conftest import IS_ROOT, core_scan, du, nodes_by_path, oracle, write
 
 from whatfills import _core
+from whatfills.rules import RuleSet, parse_rules_text
 
 
 def make_tree(root, seed=1, dirs=40, files=400, max_size=200_000):
@@ -346,3 +347,24 @@ def test_hard_link_table_limit(tmp_path):
     # one file is tracked and counted once; the other two are counted at each link
     assert raw["nodes"][0][4] == 5
     assert raw["links"]["untracked"] == 4 and raw["stats"]["hardlink_dupes"] == 1
+
+
+@pytest.mark.parametrize("buffer", [600, 4096, 128 * 1024])
+def test_marker_found_in_long_listings(tmp_path, buffer):
+    # A folder whose listing takes several reads is still recognised by a name
+    # inside it, wherever that name comes in the listing, and every entry is
+    # counted once.
+    env = tmp_path / "env"
+    for i in range(400):
+        write(env / f"f{i:03d}.py", size=1)
+    write(env / "pyvenv.cfg", size=10)
+    write(tmp_path / "other" / "x.bin", size=5000)
+    text = '[[rule]]\nid = "venv"\nname = "venv"\ndirs = ["*"]\nrequire_child = ["pyvenv.cfg"]\n'
+    rules = RuleSet(parse_rules_text(text, "t.toml"), homes=[])
+    raw = core_scan(tmp_path, dents_buffer=buffer, **rules.compile())
+    venv = rules.by_id["venv"].num
+    matches = [m for m in raw["matches"] if m[0] == venv]
+    assert [os.fsdecode(m[2]) for m in matches] == [str(env)]
+    assert matches[0][3] == oracle(tmp_path)[str(env)][0]
+    assert matches[0][5] == 401
+    assert raw["nodes"][0][4] == 402

@@ -199,6 +199,15 @@ def _parse_rule(raw: dict, where: str, source: str) -> Rule:
     req_sib = _str_list(raw.get("require_sibling", []), where, "require_sibling")
     if (req_child or req_sib) and files:
         raise RuleError(f"{where}: 'require_child' and 'require_sibling' only apply to folder rules")
+    for key, names, place, example in (("require_child", req_child, "inside the folder", "pyvenv.cfg"),
+                                       ("require_sibling", req_sib, "next to the folder", "Cargo.toml")):
+        for n in names:
+            if not n.strip("/") or n.startswith("/") or any(p in (".", "..") for p in n.split("/")):
+                raise RuleError(f"{where}: '{key}' entry {n!r} must be a name {place}, like \"{example}\", "
+                                "not empty, absolute or with '.' or '..' parts")
+    if "*" in dirs and not req_child:
+        raise RuleError(f"{where}: dirs entry '*' matches every folder; add 'require_child' to say what must be "
+                        "inside it, for example require_child = [\"pyvenv.cfg\"]")  # fmt: skip
     opaque = raw.get("opaque", False)
     if not isinstance(opaque, bool):
         raise RuleError(f"{where}: 'opaque' must be true or false")

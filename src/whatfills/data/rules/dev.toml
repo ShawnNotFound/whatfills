@@ -42,7 +42,7 @@ id = "python-venv"
 name = "Python virtual environments"
 category = "dev"
 safety = "regenerable"
-dirs = [".venv", "venv", ".env", "env", "virtualenv", ".virtualenvs/*"]
+dirs = ["*"]
 require_child = ["pyvenv.cfg"]
 opaque = true
 explain = "Python virtual environments. Each one holds its own copy of every installed package. Recreate one from the project's requirements when you need it again."
@@ -99,6 +99,15 @@ opaque = true
 explain = "Packages and virtual environments managed by Poetry. Poetry recreates them when needed."
 
 [[rule]]
+id = "conda-base"
+name = "Conda installation"
+category = "dev"
+safety = "caution"
+dirs = ["*"]
+require_child = ["condabin"]
+explain = "Conda itself (Anaconda, Miniconda or Miniforge) and its base environment. Keep it while you use conda. Its other environments, and usually its package cache, are listed separately."
+
+[[rule]]
 id = "conda-pkgs"
 name = "Conda package cache"
 category = "caches"
@@ -113,12 +122,14 @@ id = "conda-envs"
 name = "Conda environments"
 category = "dev"
 safety = "review"
-dirs = ["anaconda3/envs", "miniconda3/envs", "miniforge3/envs", "mambaforge/envs", "micromamba/envs", ".conda/envs", "conda/envs"]
+dirs = ["*"]
+require_child = ["conda-meta"]
 opaque = true
-explain = "Conda environments. Remove the ones you no longer use; each can hold several GB."
+explain = "Conda environments, including ones created inside a project with conda create -p. Remove the ones you no longer use; each can hold several GB."
 fix = [
   { label = "List environments", run = "conda env list" },
-  { label = "Remove one environment", run = "conda env remove -n NAME" },
+  { label = "Remove one environment by name", run = "conda env remove -n NAME" },
+  { label = "Remove one environment by its folder", run = "conda env remove -p FOLDER" },
 ]
 
 [[rule]]

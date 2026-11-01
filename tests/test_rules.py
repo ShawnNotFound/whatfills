@@ -57,6 +57,11 @@ def test_builtin_rules_load_and_compile():
         ('[[rules]]\nid = "x"', "unknown top-level key 'rules' (did you mean 'rule'?)"),
         ('[[rule]]\nid = "x"\nname = "X"\ndirs = ["a"]\nopaque = "yes"', "'opaque' must be true or false"),
         ('[[rule]]\nid = "x"\nname = "X"\nfiles = ["*.a"]\nopaque = true', "'opaque' only applies to folder rules"),
+        ('[[rule]]\nid = "x"\nname = "X"\ndirs = ["*"]', "dirs entry '*' matches every folder; add 'require_child'"),
+        ('[[rule]]\nid = "x"\nname = "X"\ndirs = ["a"]\nrequire_child = [""]', "'require_child' entry '' must be a name"),
+        ('[[rule]]\nid = "x"\nname = "X"\ndirs = ["a"]\nrequire_sibling = ["/etc"]', "entry '/etc' must be a name next to"),
+        ('[[rule]]\nid = "x"\nname = "X"\ndirs = ["*"]\nrequire_child = ["."]', "not empty, absolute or with '.' or '..'"),
+        ('[[rule]]\nid = "x"\nname = "X"\ndirs = ["a"]\nrequire_child = ["b/../c"]', "entry 'b/../c' must be a name"),
     ],
 )
 def test_validation_messages(toml, message):
@@ -292,3 +297,105 @@ def test_opaque_rule_owns_everything_inside(tmp_path):
     (loc,) = t["nm"].locations
     assert loc.alloc == sizes[str(nm)][0] - os.stat(nm / "pkg" / "disk.iso").st_blocks * 512
 
+
+MARKER_RULES = """
+[[rule]]
+id = "venv"
+name = "venv"
+dirs = ["*"]
+require_child = ["pyvenv.cfg"]
+opaque = true
+
+[[rule]]
+id = "cache"
+name = "cache"
+dirs = [".cache"]
+
+[[rule]]
+id = "pycache"
+name = "bytecode"
+dirs = ["__pycache__"]
+"""
+
+
+def test_marker_rule_matches_any_folder_name(tmp_path):
+    proj = tmp_path / "proj"
+    for env in (".venv-tvm", "env39"):
+        write(proj / env / "pyvenv.cfg", size=100)
+        write(proj / env / "lib" / "site-packages" / "x.so", size=50_000)
+        write(proj / env / "lib" / "site-packages" / "__pycache__" / "x.pyc", size=5_000)
+    write(proj / "plain" / "data.bin", size=20_000)
+    write(proj / "src" / "__pycache__" / "y.pyc", size=5_000)
+
+    r = scan(tmp_path, MARKER_RULES)
+    t = totals(r)
+    sizes = oracle(tmp_path)
+    assert sum(x.alloc for x in r.totals) == r.total_alloc
+    got = {m.path: m.alloc for m in t["venv"].locations}
+    assert got == {str(proj / e): sizes[str(proj / e)][0] for e in (".venv-tvm", "env39")}
+    # __pycache__ inside the environments belongs to them
+    assert [m.path for m in t["pycache"].locations] == [str(proj / "src" / "__pycache__")]
+
+
+def test_marker_takes_over_inside_a_matched_folder(tmp_path):
+    cache = tmp_path / "home" / ".cache"
+    write(cache / "tool" / "env" / "pyvenv.cfg", size=100)
+    write(cache / "tool" / "env" / "lib.so", size=60_000)
+    write(cache / "other.dat", size=30_000)
+
+    r = scan(tmp_path, MARKER_RULES)
+    t = totals(r)
+    sizes = oracle(tmp_path)
+    assert sum(x.alloc for x in r.totals) == r.total_alloc
+    (env,) = t["venv"].locations
+    (c,) = t["cache"].locations
+    env_alloc, env_app = sizes[str(cache / "tool" / "env")][:2]
+    # the folder's own size moved with it
+    assert (env.alloc, env.apparent) == (env_alloc, env_app) == (t["venv"].alloc, t["venv"].apparent)
+    assert (c.alloc, c.apparent) == (sizes[str(cache)][0] - env_alloc, sizes[str(cache)][1] - env_app)
+    assert t["cache"].files == 1
+
+
+def test_marker_rule_and_path_rule_on_one_folder(tmp_path):
+    write(tmp_path / "special" / "pyvenv.cfg", size=100)
+    write(tmp_path / "special" / "lib.so", size=40_000)
+    special = '[[rule]]\nid = "special"\nname = "special"\ndirs = ["special"]\n'
+    size = oracle(tmp_path)[str(tmp_path / "special")][0]
+    # The rule listed first wins, whichever way it matches.
+    t = totals(scan(tmp_path, special + MARKER_RULES))
+    assert [m.alloc for m in t["special"].locations] == [size] and "venv" not in t
+    r = scan(tmp_path, MARKER_RULES + special)
+    t = totals(r)
+    assert [m.alloc for m in t["venv"].locations] == [size] and "special" not in t
+    assert sum(x.alloc for x in r.totals) == r.total_alloc
+
+
+def test_marker_rule_on_the_scanned_folder(tmp_path):
+    write(tmp_path / "pyvenv.cfg", size=100)
+    write(tmp_path / "lib.so", size=40_000)
+    r = scan(tmp_path, MARKER_RULES)
+    assert r.totals[0].rule.id == "venv"
+    assert r.totals[0].alloc == r.total_alloc
+
+
+def test_conda_layout(tmp_path):
+    base = tmp_path / "miniconda3"
+    write(base / "condabin" / "conda", size=1_000)
+    write(base / "conda-meta" / "history", size=1_000)
+    write(base / "lib" / "libpython.so", size=40_000)
+    write(base / "pkgs" / "numpy.conda", size=80_000)
+    for env in ("a", "b"):
+        write(base / "envs" / env / "conda-meta" / "history", size=1_000)
+        write(base / "envs" / env / "lib" / "x.so", size=30_000)
+    write(tmp_path / "proj" / ".conda-llvm" / "conda-meta" / "history", size=1_000)
+    write(tmp_path / "proj" / ".conda-llvm" / "lib" / "libLLVM.so", size=90_000)
+    write(tmp_path / "proj" / ".venv" / "pyvenv.cfg", size=100)
+
+    r = run_scan(str(tmp_path), Settings(), RuleSet(builtin_rules(), homes=[]))
+    t = totals(r)
+    assert [m.path for m in t["conda-base"].locations] == [str(base)]
+    assert [m.path for m in t["conda-pkgs"].locations] == [str(base / "pkgs")]
+    envs = {str(base / "envs" / "a"), str(base / "envs" / "b"), str(tmp_path / "proj" / ".conda-llvm")}
+    assert {m.path for m in t["conda-envs"].locations} == envs
+    assert [m.path for m in t["python-venv"].locations] == [str(tmp_path / "proj" / ".venv")]
+    assert sum(x.alloc for x in r.totals) == r.total_alloc

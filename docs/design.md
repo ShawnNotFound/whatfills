@@ -97,8 +97,10 @@ When crossing mounts, Python plans which ones to enter, shallowest first:
 A rule says what a folder or file is. Folder rules match by an exact path
 (`/var/log/journal`, or `~/.cache/pip` in every home folder), by the end of a
 path (`node_modules`, `.cache/huggingface`), and optionally by a file that
-must exist inside (`pyvenv.cfg` for virtual environments) or next to the
-folder (`Cargo.toml` for Rust `target` folders). File rules match names
+must exist inside (`HEAD` for `.git`) or next to the folder (`Cargo.toml` for
+Rust `target` folders). A rule can also match any folder by a name inside it,
+whatever the folder is called: virtual environments are found by their
+`pyvenv.cfg` and conda environments by `conda-meta`. File rules match names
 (`*.iso`, `*-json.log`) with an optional minimum size and conditions on the
 folder rules they must be inside or outside.
 
@@ -108,6 +110,12 @@ Rules are compiled once into tables the scanner checks inline:
   If several match, the first in priority order wins: your own rules before
   the built-in ones, then the order of the rules files, and within one rule
   exact paths before path endings;
+- rules that match any folder by a name inside it are checked when the
+  folder itself is read, before any of its entries is counted. The scanner
+  looks for the name in the entries it has read and reads on to the end of
+  the listing, which it would do anyway, so these rules cost no extra
+  lookups. Only a folder too big for one read buffer is checked with a
+  lookup. If such a rule claims a folder, the folder's own size moves to it;
 - a folder without a match inherits its parent's cause, so a deeper match
   takes over below it: `~/.cache` is "Other app caches", but
   `~/.cache/pip` inside it is "pip download cache";
