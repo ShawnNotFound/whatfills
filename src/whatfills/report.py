@@ -193,7 +193,8 @@ def render_text(r: ScanResult, style: Style, top: int = 10, cols: int = 100) -> 
         fs_desc = f" on {r.mount.fstype} ({show(src)}{', ' + kind if kind else ''})"
     out.append(s.bold(f"whatfills {__version__}") + f"  {show(r.root)}{fs_desc}")
     mode = "file sizes" if r.settings.apparent_size else "disk usage"
-    out += _para(f"Scanned {format_count(r.tree.files)} files in {format_count(r.tree.dirs + 1)} folders "
+    # Whole numbers here, so the two counts read alike (151,203 files in 17,044 folders).
+    out += _para(f"Scanned {r.tree.files:,} files in {r.tree.dirs + 1:,} folders "
                  f"in {format_duration(r.elapsed)} ({r.settings.effort} effort, {r.threads} threads, {mode}).", w, "")  # fmt: skip
     if r.partial:
         why = "the time budget ran out" if r.budget_hit else "you pressed Ctrl-C"

@@ -41,6 +41,11 @@ def test_sections(result):
     assert "What you can do" in out and "$ pkg clean" in out
 
 
+def test_scan_line_counts_read_alike(result):
+    result.tree.files, result.tree.dirs = 151_203, 17_043
+    assert "Scanned 151,203 files in 17,044 folders in " in text(result)
+
+
 def test_narrow_terminal_still_renders(result):
     out = text(result, cols=60)
     assert "package cache" in out
