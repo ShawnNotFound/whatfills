@@ -333,7 +333,13 @@ def render_text(r: ScanResult, style: Style, top: int = 10, cols: int = 100) -> 
                 if extra:
                     out.append(indent + s.dim(extra.strip()))
         if _shared_matters(t):
-            note = f"{format_size(t.shared)} of it is hard-linked from elsewhere, so deleting it frees less"
+            # Links counted here whose other links are outside this cause's
+            # folders (not the links between them, which the notes cover).
+            if t.rule.kind == "folders":
+                place = "from outside " + ("these folders" if t.matches > 1 else "this folder")
+            else:
+                place = "from other places"
+            note = f"{format_size(t.shared)} of it is also hard-linked {place}, so deleting it frees less"
             out += [indent + s.dim(x) for x in _wrap(note, w - len(indent))]
     if not rows:
         out.append("  Nothing found.")

@@ -60,7 +60,7 @@ def test_hard_link_sharing_is_explained(result):
     result.links = {"cross_cause_bytes": 200 << 20, "linked_inside_bytes": 300 << 20, "untracked": 3, "table_limit": 100}
     result.hardlink_dupes = 1234
     out = " ".join(text(result).split())  # undo line wrapping
-    assert "200.0 MiB of it is hard-linked from elsewhere, so deleting it frees less" in out
+    assert "200.0 MiB of it is also hard-linked from outside this folder, so deleting it frees less" in out
     assert "Deleting it frees less than this" in out
     assert "1,234 extra hard links to files already counted were not counted again. Those files hold 300.0 MiB." in out
     assert "folders that share them can show less than du gives for each folder on its own" in out
@@ -129,7 +129,7 @@ def test_cause_rows_fit_the_width(result, monkeypatch):
         assert [x for x in table if len(x) > cols] == []
         joined = " ".join(" ".join(table).split())
         assert "1,234 folders" in joined and "100% not" in joined and "in 90+ days" in joined
-        assert "1.0 GiB of it is hard-linked from elsewhere, so deleting it frees less" in joined
+        assert "1.0 GiB of it is also hard-linked from outside these folders, so deleting it frees less" in joined
 
 
 def test_cause_paths_keep_their_start(tmp_path, monkeypatch):
