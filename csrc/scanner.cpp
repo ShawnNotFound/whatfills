@@ -306,6 +306,7 @@ LinkSummary Scanner::link_summary(std::vector<uint64_t>& shared_by_rule) const {
         shared_by_rule[static_cast<size_t>(r.rule)] += r.alloc;
       }
       if (r.other_rule) out.cross_rule_alloc += r.alloc;
+      if (r.seen > 1) out.inside_alloc += r.alloc;
     }
   }
   for (const auto& ts : states_) out.untracked += ts->links_untracked;

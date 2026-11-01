@@ -57,11 +57,17 @@ def test_hard_link_sharing_is_explained(result):
     t = next(x for x in result.totals if x.rule.id == "pkgs")
     t.alloc = 500 << 20
     t.shared = 200 << 20
-    result.links = {"cross_cause_bytes": 200 << 20, "untracked": 3, "table_limit": 100}
+    result.links = {"cross_cause_bytes": 200 << 20, "linked_inside_bytes": 300 << 20, "untracked": 3, "table_limit": 100}
+    result.hardlink_dupes = 1234
     out = " ".join(text(result).split())  # undo line wrapping
     assert "200.0 MiB of it is hard-linked from elsewhere, so deleting it frees less" in out
     assert "Deleting it frees less than this" in out
-    assert "counted once, under the first place the scan reached" in out
+    assert "1,234 extra hard links to files already counted were not counted again. Those files hold 300.0 MiB." in out
+    assert "folders that share them can show less than du gives for each folder on its own" in out
+    assert "200.0 MiB is in files hard-linked from places that match different causes" in out
+    result.links["linked_inside_bytes"] = 1 << 20  # too little to explain
+    out = " ".join(text(result).split())
+    assert "were not counted again. 200.0 MiB is in files" in out
     assert "3 hard links were found after the hard-link table was full" in out
 
 
@@ -93,7 +99,8 @@ def test_json_summary(result):
     assert causes["pkgs"]["shared_bytes"] == 0
     assert causes["pkgs"]["fixes"][0]["run"] == "pkg clean"
     assert sum(c["bytes"] for c in data["causes"]) == data["scanned"]["bytes"]
-    assert set(data["hard_links"]) == {"files", "bytes", "shared_files", "shared_bytes", "cross_cause_bytes", "untracked"}
+    assert set(data["hard_links"]) == {"files", "bytes", "shared_files", "shared_bytes", "cross_cause_bytes",
+                                       "linked_inside_bytes", "untracked"}
     assert data["folders"][0]["path"] == result.root
 
 

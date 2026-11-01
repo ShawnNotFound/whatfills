@@ -336,6 +336,7 @@ def test_hard_link_summary(tmp_path):
     assert links["files"] == 2 and links["shared_files"] == 1  # big.bin's links are all inside
     assert links["shared_bytes"] == os.stat(c).st_blocks * 512
     assert links["cross_cause_bytes"] == 0 and links["untracked"] == 0
+    assert links["linked_inside_bytes"] == os.stat(a).st_blocks * 512  # c.bin has one link inside
     assert raw["rules"][0][6] == links["shared_bytes"]  # no rules: everything is unclassified
 
 

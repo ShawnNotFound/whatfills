@@ -174,7 +174,7 @@ def test_hard_links_shared_between_causes(tmp_path):
     lib_alloc = os.stat(lib).st_blocks * 512
     x_alloc = os.stat(outside).st_blocks * 512
     assert r.links["files"] == 2 and r.links["shared_files"] == 2
-    assert r.links["cross_cause_bytes"] == lib_alloc
+    assert r.links["cross_cause_bytes"] == lib_alloc == r.links["linked_inside_bytes"]
     assert r.links["shared_bytes"] == lib_alloc + x_alloc
     assert sum(x.shared for x in r.totals) == r.links["shared_bytes"]
     assert t["pkgs"].shared in (x_alloc, x_alloc + lib_alloc)  # lib.so is credited to whichever link came first

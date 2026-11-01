@@ -183,6 +183,7 @@ struct LinkSummary {
   uint64_t files = 0, alloc = 0;                // counted once each
   uint64_t shared_files = 0, shared_alloc = 0;  // some links outside the scan, or under another cause
   uint64_t cross_rule_alloc = 0;                // links under different causes
+  uint64_t inside_alloc = 0;                    // more than one link inside the scan
   uint64_t untracked = 0;                       // links counted without the table (it was full)
 };
 

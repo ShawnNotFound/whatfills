@@ -148,7 +148,11 @@ the file, so the report can say:
   scan, or from another cause, so deleting that cause frees less than its
   size;
 - how many files were linked from places with different causes (a package
-  cache and the environments installed from it, for example).
+  cache and the environments installed from it, for example);
+- how much is in files with more than one link inside the scan. Which
+  folder counts such a file depends on which link a worker reaches first,
+  so with several threads the split between folders that share files can
+  change from one scan to the next, while the total stays the same.
 
 The table is capped by the effort level (8 million files by default). Links
 found after that are counted again, and the report says how many there were.

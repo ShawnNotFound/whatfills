@@ -557,14 +557,19 @@ def render_text(r: ScanResult, style: Style, top: int = 10, cols: int = 100) -> 
         notes.append(f"({format_count(r.n_skips - len(r.skips))} more skipped paths not listed.)")
     if r.excluded_names:
         notes.append(f"Skipped {format_count(r.excluded_names)} entries whose names are excluded by your settings.")
-    if r.hardlink_dupes:
-        notes.append(f"{format_count(r.hardlink_dupes)} extra hard links to files already counted were not counted again.")
     links = r.links or {}
+    if r.hardlink_dupes:
+        text = f"{format_count(r.hardlink_dupes)} extra hard links to files already counted were not counted again."
+        if links.get("linked_inside_bytes", 0) >= (64 << 20):
+            text += (f" Those files hold {format_size(links['linked_inside_bytes'])}. Each one is counted once, in the "
+                     "folder where the scan reached it first, so folders that share them can show less than du gives "
+                     "for each folder on its own, and the split between them can change from one scan to the next.")
+        notes.append(text)
     if links.get("cross_cause_bytes", 0) >= (64 << 20):
         notes.append(
-            f"{format_size(links['cross_cause_bytes'])} is in files hard-linked from places that match different causes "
-            "(for example a package cache and the environments made from it). Each file is counted once, under the "
-            "first place the scan reached, and that can change from one scan to the next."
+            f"{format_size(links['cross_cause_bytes'])} is in files hard-linked from places that match different "
+            "causes (for example a package cache and the environments made from it), so the split between those "
+            "causes can change from one scan to the next too."
         )
     if links.get("untracked"):
         notes.append(
@@ -686,5 +691,6 @@ def to_dict(r: ScanResult, top: int = 50, all_folders: bool = False) -> dict:
         "excluded_by_name": r.excluded_names,
         "hardlink_duplicates": r.hardlink_dupes,
         "hard_links": {k: (r.links or {}).get(k, 0) for k in ("files", "bytes", "shared_files", "shared_bytes",
-                                                              "cross_cause_bytes", "untracked")},  # fmt: skip
+                                                              "cross_cause_bytes", "linked_inside_bytes",
+                                                              "untracked")},  # fmt: skip
     }

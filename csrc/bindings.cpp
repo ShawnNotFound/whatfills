@@ -253,6 +253,7 @@ nb::dict build_result(wf::Scanner& s) {
   ld["shared_files"] = links.shared_files;
   ld["shared_bytes"] = links.shared_alloc;
   ld["cross_cause_bytes"] = links.cross_rule_alloc;
+  ld["linked_inside_bytes"] = links.inside_alloc;
   ld["untracked"] = links.untracked;
   ld["table_limit"] = opt.max_links;
   out["links"] = ld;
