@@ -113,11 +113,13 @@ def shorten_path(path: str, limit: int, keep: int = 0) -> str:
     left out, each run of them shown as "…", and the last part stays whole
     (if it alone is too long, the middle of the path is cut instead).
 
-    Folders are kept in this order, as far as they fit: the ones just above
-    the last part, then the first part and those after it. With `keep`, the
-    folder made of the first `keep` parts (the folder that explains a file,
-    say) comes first, and the folders just above it come before the start of
-    the path: …/huggingface/…/models--Qwen--Qwen2.5-3B/blobs/6b86b273…"""
+    The start of the path ("/" or "~") is kept when there is room, so a
+    shortened path still shows where it starts. Then folders are kept in this
+    order, as far as they fit: the ones just above the last part, then the
+    first part and those after it. With `keep`, the folder made of the first
+    `keep` parts (the folder that explains a file, say) comes first, and the
+    folders just above it come before the first part:
+    /…/huggingface/…/models--Qwen--Qwen2.5-3B/blobs/6b86b273…"""
     if display_width(path) <= limit or limit < 8:
         return path
     path = _HEX_RUN.sub(lambda m: m.group(0)[:8] + "…", path)
@@ -130,6 +132,7 @@ def shorten_path(path: str, limit: int, keep: int = 0) -> str:
         return shorten_middle(path, limit)
     shown = [False] * n
     shown[-1] = True
+    root = False  # show the leading "/" even when the first part is left out: /…/name
 
     def render() -> str:
         out, gap = [], False
@@ -139,7 +142,7 @@ def shorten_path(path: str, limit: int, keep: int = 0) -> str:
                 gap = False
             else:
                 gap = True
-        return (lead if shown[0] else "") + "/".join(out)
+        return (lead if shown[0] or root else "") + "/".join(out)
 
     def add(i: int) -> bool:
         if shown[i]:
@@ -150,6 +153,10 @@ def shorten_path(path: str, limit: int, keep: int = 0) -> str:
         shown[i] = False
         return False
 
+    if lead:
+        root = display_width(lead + "…/" + parts[-1]) <= limit
+    elif parts[0] == "~":
+        add(0)
     anchor = keep - 1 if 0 < keep < n - 1 else -1
     runs = [range(n - 2, anchor, -1)]  # the folders just above the last part
     if anchor >= 0 and add(anchor):

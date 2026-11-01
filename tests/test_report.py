@@ -130,9 +130,12 @@ def test_shorten_path_keeps_the_file_name():
 
     p = "/home/alex/Downloads/ubuntu-24.04.1-live-server-amd64.iso"
     assert shorten_path(p, 100) == p
-    # the folders right above the file come first, then the start of the path
-    assert shorten_path(p, 50) == "…/Downloads/ubuntu-24.04.1-live-server-amd64.iso"
-    assert shorten_path(p, 56) == "…/alex/Downloads/ubuntu-24.04.1-live-server-amd64.iso"
+    # where the path starts, then the folders right above the file, then the rest of its start
+    assert shorten_path(p, 50) == "/…/Downloads/ubuntu-24.04.1-live-server-amd64.iso"
+    assert shorten_path(p, 56) == "/…/alex/Downloads/ubuntu-24.04.1-live-server-amd64.iso"
+    assert shorten_path(p, 38) == "…/ubuntu-24.04.1-live-server-amd64.iso"  # no room for the leading /
+    assert shorten_path("~/GitHub/contrib/.venv-tvm-relax", 19) == "~/…/.venv-tvm-relax"
+    assert shorten_path("~/GitHub/contrib/.venv-tvm-relax", 17) == "…/.venv-tvm-relax"
     assert shorten_path("/a/" + "x" * 80, 40).count("…") == 1  # a name too long to keep whole is cut in the middle
 
 
@@ -158,11 +161,11 @@ def test_shorten_path_keeps_a_chosen_folder():
 
     blob = "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
     hf = "/home/alex/.cache/huggingface/hub/models--Qwen--Qwen2.5-3B-Instruct/blobs/" + blob
-    assert shorten_path(hf, 65, keep=4) == "…/huggingface/…/models--Qwen--Qwen2.5-3B-Instruct/blobs/6b86b273…"
+    assert shorten_path(hf, 66, keep=4) == "/…/huggingface/…/models--Qwen--Qwen2.5-3B-Instruct/blobs/6b86b273…"
     lib = "~/GitHub/contrib/.venv-tvm-relax/lib/python3.13/site-packages/torch/lib/libtorch_cpu.so"
     plain = shorten_path(lib, 60)
-    assert ".venv-tvm-relax" not in plain
-    assert shorten_path(lib, 60, keep=4) == "…/.venv-tvm-relax/…/site-packages/torch/lib/libtorch_cpu.so"
+    assert plain == "~/…/lib/python3.13/site-packages/torch/lib/libtorch_cpu.so"
+    assert shorten_path(lib, 60, keep=4) == "~/GitHub/contrib/.venv-tvm-relax/…/torch/lib/libtorch_cpu.so"
     # the file's own folder, the file itself or past the end: nothing to add
     for keep in (-1, 0, 9, 10, 99):
         assert shorten_path(lib, 60, keep=keep) == plain
