@@ -1,6 +1,6 @@
 $ sudo whatfills /
 whatfills 0.1.0.dev0  / on ext4 (/dev/loop0, SSD)
-Scanned 82,229 files in 10,799 folders in 555 ms (normal effort, 16 threads, disk usage).
+Scanned 82,229 files in 10,799 folders in 554 ms (normal effort, 16 threads, disk usage).
 
 Disk
   54.8 GiB total, 49.4 GiB used, 2.6 GiB free for normal users  █████████████████████████████░░ 96%
@@ -20,7 +20,7 @@ Why it's full: space by cause
      3.3 GiB   7.3%  Docker container logs                      review
                      2 files, biggest /var/lib/docker/containers/14c2529e…/14c2529e…-json.log
      2.6 GiB   5.8%  Disk images (ISO)                          review
-                     …/Downloads/ubuntu-24.04.1-live-server-amd64.iso (100% not used in 90+ days)
+                     /…/Downloads/ubuntu-24.04.1-live-server-amd64.iso (100% not used in 90+ days)
      2.5 GiB   5.6%  PostgreSQL data                            caution
                      /var/lib/postgresql
      2.4 GiB   5.2%  Installed software                         caution
@@ -59,12 +59,12 @@ Largest folders
      1.3 GiB   2.9%        └─ modules  [Installed kernels (modules)]
 
 Largest files
-     4.0 GiB       7 months  alex  …/huggingface/…/models--Qwen--Qwen2.5-3B-Instruct/blobs/5feceb66…
+     4.0 GiB       7 months  alex  /home/…/hub/models--Qwen--Qwen2.5-3B-Instruct/blobs/5feceb66…
      3.1 GiB  under an hour  root  /var/lib/docker/containers/14c2529e…/14c2529e…-json.log
      2.6 GiB      11 months  alex  /home/alex/Downloads/ubuntu-24.04.1-live-server-amd64.iso
-     2.2 GiB       7 months  alex  …/huggingface/…/models--Qwen--Qwen2.5-3B-Instruct/blobs/6b86b273…
+     2.2 GiB       7 months  alex  /home/…/hub/models--Qwen--Qwen2.5-3B-Instruct/blobs/6b86b273…
      2.0 GiB      13 months  root  /swap.img
-     1.3 GiB       5 months  alex  …/.venv/lib/python3.12/site-packages/torch/lib/libtorch_cuda.so
+     1.3 GiB       5 months  alex  /…/.venv/lib/python3.12/site-packages/torch/lib/libtorch_cuda.so
    940.0 MiB  under an hour  root  /var/log/nginx/access.log
    880.0 MiB          1 day  root  /var/log/nginx/access.log.1
    820.0 MiB       3 months  alex  /home/alex/.local/share/Trash/files/old-dataset.tar.gz
@@ -92,7 +92,7 @@ Files hidden under mount points
 Deleted files still using space
   These files were deleted, but a running program still has them open, so their space is not freed
   until that program closes them or restarts.
-     2.4 GiB  /var/log/app/worker.log  held by worker (pid 15278)
+     2.4 GiB  /var/log/app/worker.log  held by worker (pid 26813)
 
 What you can do
   1. Docker images, containers and build cache: 8.3 GiB in /var/lib/docker
