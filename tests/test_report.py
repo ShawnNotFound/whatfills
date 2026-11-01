@@ -172,6 +172,17 @@ def test_shorten_path_keeps_a_chosen_folder():
     assert shorten_path(lib, 30, keep=4) == "~/…/torch/lib/libtorch_cpu.so"  # no room for it
 
 
+def test_only_folders_with_names_of_their_own_are_kept_in_view():
+    rules = {r.id: r for r in builtin_rules()}
+    assert report._has_own_name(rules["python-venv"], "/p/.venv-tvm")
+    assert report._has_own_name(rules["conda-envs"], "/p/_envs/h5py")
+    assert report._has_own_name(rules["cmake-build"], "/p/cmake-build-debug")
+    # these names come from the rule; the folders just above the file say more
+    assert not report._has_own_name(rules["cmake-build"], "/p/tvm/build")
+    assert not report._has_own_name(rules["hf-cache"], "/home/a/.cache/huggingface")
+    assert not report._has_own_name(rules["node-modules"], "/p/web/node_modules")
+
+
 def test_largest_files_show_the_environment_they_are_in(tmp_path):
     env = tmp_path / "work" / "projects" / "contrib" / ".venv-tvm-relax"
     write(env / "pyvenv.cfg", size=100)

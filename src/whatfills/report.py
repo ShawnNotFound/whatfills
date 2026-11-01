@@ -91,15 +91,30 @@ def _where_text(r: ScanResult, t, room: int = 10_000) -> str:
     return lead + shorten_path(path, room - display_width(lead))
 
 
+def _has_own_name(rule, folder: str) -> bool:
+    """Whether a folder that a rule matched has a name of its own rather than
+    the fixed name in the rule: a virtual environment called .venv-tvm
+    (dirs = ["*"]) has one, a node_modules folder does not."""
+    name = folder.rstrip("/").rsplit("/", 1)[-1]
+    lasts = [p.rstrip("/").rsplit("/", 1)[-1] for p in rule.dirs + rule.paths]
+    return name not in lasts and any(any(c in x for c in "*?[") for x in lasts)
+
+
 def _cause_folders(r: ScanResult) -> dict:
-    """Rule number -> the folders it matched, deepest first."""
-    return {t.rule.num: sorted((m.path for m in t.locations), key=len, reverse=True) for t in r.totals if t.locations}
+    """Rule number -> the folders it matched that have names of their own,
+    deepest first."""
+    out = {}
+    for t in r.totals:
+        own = [m.path for m in t.locations if _has_own_name(t.rule, m.path)]
+        if own:
+            out[t.rule.num] = sorted(own, key=len, reverse=True)
+    return out
 
 
 def _short_file_path(path: str, room: int, folders: list) -> str:
-    """A file's path for display. When it is inside a folder that explains it
-    (a virtual environment, a model cache), that folder is kept in view if
-    there is room."""
+    """A file's path for display. When it is inside one of `folders` (a
+    virtual environment or conda environment, found by what it holds), that
+    folder is kept in view if there is room."""
     shown = home_short(show(path))
     for d in folders:
         if path.startswith(d.rstrip("/") + "/"):
